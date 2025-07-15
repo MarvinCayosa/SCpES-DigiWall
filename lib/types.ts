@@ -12,7 +12,7 @@ export interface StickyNote {
   fontWeight: string
   fontStyle: string
   textDecoration: string
-  drawingData: { imageData?: string } | null
+  drawingData: { imageData?: string; width?: number; height?: number } | null
   createdAt: Date
   updatedAt: Date
 }

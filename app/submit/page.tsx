@@ -30,8 +30,17 @@ export default function SubmitPage() {
 
   const handleSave = async (note: StickyNote) => {
     try {
-      const { id, x, y, width, height, ...rest } = note;
+      // Generate a random id and random coordinates near the focal point
+      const id = Date.now().toString() + Math.floor(Math.random() * 10000).toString();
+      const x = 800 + Math.random() * 400; // 800-1200
+      const y = 400 + Math.random() * 400; // 400-800
+      const { id: _id, x: _x, y: _y, width, height, ...rest } = note;
       await push(ref(db, "notes"), {
+        id,
+        x,
+        y,
+        width: width ?? 200,
+        height: height ?? 200,
         ...rest,
         author: "anonymous",
         createdAt: Date.now(),

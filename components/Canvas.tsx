@@ -67,9 +67,11 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
     const handleMouseDown = useCallback(
       (e: React.MouseEvent) => {
         if (isNoteDraggingGlobal) return;
+        // Only allow panning with mouse (desktop)
+        if (e.type === 'mousedown') {
           isDragging.current = true
           lastPanPoint.current = { x: e.clientX, y: e.clientY }
-        startPan.current = { ...pan };
+          startPan.current = { ...pan };
 
           const handleGlobalMouseMove = (e: MouseEvent) => {
             if (!isDragging.current) return
@@ -81,11 +83,10 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
             animationFrameRef.current = requestAnimationFrame(() => {
               const deltaX = e.clientX - lastPanPoint.current.x
               const deltaY = e.clientY - lastPanPoint.current.y
-            // Use startPan for smooth panning
               onPanChange({
-              x: startPan.current.x + (e.clientX - lastPanPoint.current.x),
-              y: startPan.current.y + (e.clientY - lastPanPoint.current.y),
-            })
+                x: startPan.current.x + (e.clientX - lastPanPoint.current.x),
+                y: startPan.current.y + (e.clientY - lastPanPoint.current.y),
+              })
             })
           }
 
@@ -100,9 +101,25 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
 
           document.addEventListener("mousemove", handleGlobalMouseMove)
           document.addEventListener("mouseup", handleGlobalMouseUp)
+        }
       },
       [pan, onPanChange],
     )
+
+    // Prevent single-finger drag panning on mobile; allow only two-finger (pinch/zoom) for board movement
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+      if (isNoteDraggingGlobal) return;
+      if (e.touches.length > 1) {
+        // Allow panning/zooming with two fingers
+        isDragging.current = true;
+        lastPanPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        startPan.current = { ...pan };
+        // You can implement pinch/zoom logic here if desired
+      } else {
+        // Prevent single-finger drag from panning the board
+        isDragging.current = false;
+      }
+    }, [pan]);
 
     // Cleanup animation frame on unmount
     useEffect(() => {
@@ -119,6 +136,7 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
         className="w-full h-full cursor-grab active:cursor-grabbing overflow-hidden"
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
         style={{
           backgroundImage: `radial-gradient(circle, #e5e5e5 1px, transparent 1px)`,
           backgroundSize: `${20 * zoom}px ${20 * zoom}px`,

@@ -168,8 +168,25 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
         img.crossOrigin = "anonymous"
         img.onload = () => {
           ctx.clearRect(0, 0, canvas.width, canvas.height)
-          // Scale the drawing to fit the smaller canvas
-          ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+          // Scale the drawing proportionally to fit the preview canvas
+          const srcW = note.drawingData && note.drawingData.width ? note.drawingData.width : img.width;
+          const srcH = note.drawingData && note.drawingData.height ? note.drawingData.height : img.height;
+          const destW = canvas.width
+          const destH = canvas.height
+          // Calculate aspect ratio fit
+          let drawW = destW, drawH = destH, offsetX = 0, offsetY = 0;
+          const srcAspect = srcW / srcH;
+          const destAspect = destW / destH;
+          if (srcAspect > destAspect) {
+            drawW = destW;
+            drawH = destW / srcAspect;
+            offsetY = (destH - drawH) / 2;
+          } else {
+            drawH = destH;
+            drawW = destH * srcAspect;
+            offsetX = (destW - drawW) / 2;
+          }
+          ctx.drawImage(img, 0, 0, srcW, srcH, offsetX, offsetY, drawW, drawH)
         }
         img.src = note.drawingData.imageData
       }
@@ -267,10 +284,10 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
         {note.drawingData?.imageData && (
           <canvas
             ref={canvasRef}
-            width={note.width - 32}
-            height={note.height - 32}
-            className="absolute inset-4 pointer-events-none z-0"
-            style={{ opacity: 0.8 }}
+            width={168}
+            height={168}
+            className="absolute left-1/2 top-1/2 pointer-events-none z-0"
+            style={{ opacity: 0.8, transform: 'translate(-50%, -50%)' }}
           />
         )}
           {/* Scaled WYSIWYG Content */}

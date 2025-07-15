@@ -35,6 +35,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
   const [drawingHistory, setDrawingHistory] = useState<string[]>([]);
   const [historyStep, setHistoryStep] = useState<number>(-1);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     setEditedNote(initialNote);
@@ -154,6 +155,8 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
 
   // Save handler for submit page
   const handleSave = useCallback(() => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const html = editorRef.current?.innerHTML || "";
     let drawingData = null;
     if (canvasRef.current) {
@@ -163,7 +166,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
       if (ctx) {
         const pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const hasContent = pixelData.data.some((channel, index) => index % 4 === 3 && channel > 0);
-        drawingData = hasContent ? { imageData } : null;
+        drawingData = hasContent ? { imageData, width: canvas.width, height: canvas.height } : null;
       }
     }
     onSave({
@@ -171,13 +174,33 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
       text: html,
       drawingData,
     });
-  }, [editedNote, onSave]);
+    // Pick a new random color different from the previous one
+    let randomColor = COMMON_COLORS[Math.floor(Math.random() * COMMON_COLORS.length)];
+    while (randomColor === editedNote.backgroundColor && COMMON_COLORS.length > 1) {
+      randomColor = COMMON_COLORS[Math.floor(Math.random() * COMMON_COLORS.length)];
+    }
+    setEditedNote({
+      ...initialNote,
+      text: "",
+      drawingData: null,
+      backgroundColor: randomColor,
+    });
+    setBackgroundColor(randomColor);
+    if (editorRef.current) editorRef.current.innerHTML = "";
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+    setTimeout(() => {
+      setIsSubmitting(false);
+    }, 3000);
+  }, [editedNote, onSave, isSubmitting, initialNote]);
 
   return (
     <div className={`w-full max-w-lg mx-auto ${mobile ? "p-2" : "p-8"} flex flex-col gap-4 bg-transparent rounded-2xl`}>
       <div
         className={`relative w-full ${mobile ? 'aspect-square' : ''} rounded-xl overflow-hidden`}
-        style={mobile ? { maxWidth: 400, maxHeight: 400, margin: '0 auto', background: `${backgroundColor}CC`, padding: 24 } : { background: `${backgroundColor}CC` }}
+        style={mobile ? { maxWidth: 400, maxHeight: 400, margin: '0 auto', background: `${editedNote.backgroundColor}CC`, padding: 24 } : { background: `${editedNote.backgroundColor}CC` }}
       >
         <canvas
           ref={canvasRef}
@@ -236,7 +259,18 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
           }}
         />
         {(!editedNote.text || editedNote.text === '<br>') && (
-          <div className="absolute inset-0 z-0 pointer-events-none text-gray-400 select-none p-2 text-lg" style={mobile ? {fontFamily: 'inherit', padding: 16} : {fontFamily: 'inherit'}}>
+          <div
+            className="absolute inset-0 z-0 pointer-events-none select-none p-2 text-lg"
+            style={{
+              color: '#222',
+              fontFamily: 'inherit',
+              padding: mobile ? 16 : undefined,
+              background: 'rgba(255,255,255,0.45)',
+              borderRadius: 8,
+              textShadow: '0 1px 4px #fff, 0 0 2px #000',
+              mixBlendMode: 'multiply',
+            }}
+          >
             Write your message...
           </div>
         )}
@@ -248,28 +282,72 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
             <Button variant={currentTool === "text" ? "secondary" : "ghost"} size="icon" onClick={() => setCurrentTool("text")} className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "text" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`} style={{ fontFamily: 'inherit', fontSize: '12px' }}><Type className="w-3 h-3" /></Button>
             <Button variant={currentTool === "brush" ? "secondary" : "ghost"} size="icon" onClick={() => setCurrentTool("brush")} className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "brush" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`} style={{ fontFamily: 'inherit', fontSize: '12px' }}><Brush className="w-3 h-3" /></Button>
             <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300 flex-shrink-0" />
-            <Select value={fontFamily} onValueChange={value => { exec('fontName', value); setFontFamily(value); updateNote({ fontFamily: value }); }}>
-              <SelectTrigger className="w-16 h-7 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontFamily: fontFamily, fontSize: '12px' }}><span style={{ fontFamily: fontFamily }}>{fontFamily}</span></SelectTrigger>
-              <SelectContent>{FONT_FAMILIES.map((font) => (<SelectItem key={font} value={font} className="text-xs" style={{ fontFamily: font, fontWeight: fontFamily === font ? 'bold' : 'normal', fontSize: '12px' }}>{font}</SelectItem>))}</SelectContent>
-            </Select>
-            <Select value={fontSize.toString()} onValueChange={value => { const size = FONT_SIZES[parseInt(value)-1] || 16; exec('fontSize', value); setFontSize(size); updateNote({ fontSize: size }); }}>
-              <SelectTrigger className="w-10 h-7 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontSize: '12px' }}><span>{fontSize}</span></SelectTrigger>
-              <SelectContent>{FONT_SIZES.map((size, idx) => (<SelectItem key={size} value={(idx+1).toString()} className="text-xs" style={{ fontSize: '12px' }}>{size}</SelectItem>))}</SelectContent>
-            </Select>
-            <Button variant="ghost" size="icon" onClick={() => exec('bold')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Bold className="w-3 h-3" /></Button>
-            <Button variant="ghost" size="icon" onClick={() => exec('italic')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Italic className="w-3 h-3" /></Button>
-            <Button variant="ghost" size="icon" onClick={() => exec('underline')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Underline className="w-3 h-3" /></Button>
-            <div className="flex items-center gap-2 relative z-[201]">
-              <ColorPickerPopover value={textColor} onChange={color => { if (currentTool === "text") { exec('foreColor', color); setTextColor(color); updateNote({ textColor: color }); } else { setTextColor(color); updateNote({ textColor: color }); } }} label="Font color" colors={["#222222", "#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#6554C0", "#FFFFFF"]} />
-            </div>
-            {/* Note Color Picker moved to first row */}
+            {/* Text controls: only show in text mode */}
+            {currentTool === "text" && <>
+              <Select value={fontFamily} onValueChange={value => { exec('fontName', value); setFontFamily(value); updateNote({ fontFamily: value }); }}>
+                <SelectTrigger className="w-16 h-7 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontFamily: fontFamily, fontSize: '12px' }}><span style={{ fontFamily: fontFamily }}>{fontFamily}</span></SelectTrigger>
+                <SelectContent>{FONT_FAMILIES.map((font) => (<SelectItem key={font} value={font} className="text-xs" style={{ fontFamily: font, fontWeight: fontFamily === font ? 'bold' : 'normal', fontSize: '12px' }}>{font}</SelectItem>))}</SelectContent>
+              </Select>
+              <Select value={fontSize.toString()} onValueChange={value => { const size = FONT_SIZES[parseInt(value)-1] || 16; exec('fontSize', value); setFontSize(size); updateNote({ fontSize: size }); }}>
+                <SelectTrigger className="w-10 h-7 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontSize: '12px' }}><span>{fontSize}</span></SelectTrigger>
+                <SelectContent>{FONT_SIZES.map((size, idx) => (<SelectItem key={size} value={(idx+1).toString()} className="text-xs" style={{ fontSize: '12px' }}>{size}</SelectItem>))}</SelectContent>
+              </Select>
+              <Button variant="ghost" size="icon" onClick={() => exec('bold')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Bold className="w-3 h-3" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => exec('italic')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Italic className="w-3 h-3" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => exec('underline')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Underline className="w-3 h-3" /></Button>
+              <div className="flex items-center gap-2 relative z-[201]">
+                <ColorPickerPopover value={textColor} onChange={color => { if (currentTool === "text") { exec('foreColor', color); setTextColor(color); updateNote({ textColor: color }); } else { setTextColor(color); updateNote({ textColor: color }); } }} label="Font color" colors={["#222222", "#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#6554C0", "#FFFFFF"]} />
+              </div>
+            </>}
+            {/* Brush controls: only show in brush mode */}
+            {currentTool === "brush" && <>
+              <span className="text-xs text-white">Brush</span>
+              <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} className="w-32 brush-slider" />
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white">Color</span>
+                <input
+                  type="color"
+                  value={textColor}
+                  onChange={(e) => { setTextColor(e.target.value); updateNote({ textColor: e.target.value }); }}
+                  className="w-8 h-8 rounded-full border-2 border-gray-300 cursor-pointer"
+                  style={{ fontFamily: 'inherit' }}
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { if (historyStep > 0) setHistoryStep((prev) => prev - 1); }}
+                className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
+                style={{ fontFamily: 'inherit', fontSize: '12px' }}
+                disabled={historyStep <= 0}
+                tabIndex={0}
+                aria-label="Undo drawing"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { if (historyStep < drawingHistory.length - 1) setHistoryStep((prev) => prev + 1); }}
+                className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
+                style={{ fontFamily: 'inherit', fontSize: '12px' }}
+                disabled={historyStep >= drawingHistory.length - 1}
+                tabIndex={0}
+                aria-label="Redo drawing"
+              >
+                <RotateCw className="w-3 h-3" />
+              </Button>
+            </>}
+            {/* Note Color Picker always visible */}
             <div className="relative flex items-center gap-2 flex-shrink-0 min-w-0 ml-2">
               <ColorPickerPopover value={backgroundColor} onChange={color => { setBackgroundColor(color); updateNote({ backgroundColor: color }); }} label="Sticky note color" />
             </div>
           </div>
           {/* Second row: only the Send button, centered and lower */}
           <div className="flex justify-center w-full mt-8 mb-2">
-            <Button onClick={() => { handleSave(); }} size="lg" className="rounded-full bg-green-400 hover:bg-green-500 text-[#18181b] px-8 h-12 text-lg font-bold shadow transition-all duration-150 border border-green-400" style={{ fontFamily: 'inherit', boxShadow: 'none' }}>Send</Button>
+            <Button onClick={() => { handleSave(); }} size="lg" className="rounded-full bg-green-400 hover:bg-green-500 text-[#18181b] px-8 h-12 text-lg font-bold shadow transition-all duration-150 border border-green-400" style={{ fontFamily: 'inherit', boxShadow: 'none' }}
+              disabled={isSubmitting}
+            >Send</Button>
           </div>
           {/* Success modal popup with dark overlay */}
           {sent && (
@@ -314,19 +392,8 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
           >
             <Brush className="w-4 h-4" />
           </Button>
-          <Button
-            variant={currentTool === "eraser" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setCurrentTool("eraser")}
-            className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "eraser" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
-            style={{ fontFamily: 'inherit' }}
-            aria-label="Eraser"
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="13" width="10" height="4" rx="1" fill="#bbb"/><rect x="5" y="3" width="10" height="10" rx="2" fill="#fff" stroke="#bbb" strokeWidth="2"/></svg>
-          </Button>
-          <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300 flex-shrink-0" />
           {/* Text Controls (show only in text mode) */}
-          <div className={`flex items-center gap-3 transition-all duration-300 ${currentTool === "text" ? 'opacity-100 max-w-[100vw]' : 'opacity-0 max-w-0 overflow-hidden pointer-events-none'}`} style={{ transition: 'all 0.3s cubic-bezier(.4,0,.2,1)' }}>
+          {currentTool === "text" && <>
             <Select value={fontFamily} onValueChange={value => { exec('fontName', value); setFontFamily(value); updateNote({ fontFamily: value }); }}>
               <SelectTrigger className="w-28 h-8 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontFamily: fontFamily }}>
                 <span style={{ fontFamily: fontFamily }}>{fontFamily}</span>
@@ -393,9 +460,9 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
                 colors={["#222222", "#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#6554C0", "#FFFFFF"]}
               />
             </div>
-          </div>
+          </>}
           {/* Brush Controls (show only in brush mode) */}
-          <div className={`flex items-center gap-3 transition-all duration-300 ${currentTool === "brush" ? 'opacity-100 max-w-[100vw]' : 'opacity-0 max-w-0 overflow-hidden pointer-events-none'}`} style={{ transition: 'all 0.3s cubic-bezier(.4,0,.2,1)' }}>
+          {currentTool === "brush" && <>
             <span className="text-xs text-white">Brush</span>
             <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} className="w-32 brush-slider" />
             <div className="flex items-center gap-2">
@@ -408,39 +475,31 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
                 style={{ fontFamily: 'inherit' }}
               />
             </div>
-          </div>
-          {currentTool === "brush" && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (historyStep > 0) setHistoryStep((prev) => prev - 1);
-                }}
-                className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
-                style={{ fontFamily: 'inherit' }}
-                disabled={historyStep <= 0}
-                tabIndex={0}
-                aria-label="Undo drawing"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (historyStep < drawingHistory.length - 1) setHistoryStep((prev) => prev + 1);
-                }}
-                className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
-                style={{ fontFamily: 'inherit' }}
-                disabled={historyStep >= drawingHistory.length - 1}
-                tabIndex={0}
-                aria-label="Redo drawing"
-              >
-                <RotateCw className="w-4 h-4" />
-              </Button>
-            </>
-          )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { if (historyStep > 0) setHistoryStep((prev) => prev - 1); }}
+              className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
+              style={{ fontFamily: 'inherit' }}
+              disabled={historyStep <= 0}
+              tabIndex={0}
+              aria-label="Undo drawing"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { if (historyStep < drawingHistory.length - 1) setHistoryStep((prev) => prev + 1); }}
+              className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
+              style={{ fontFamily: 'inherit' }}
+              disabled={historyStep >= drawingHistory.length - 1}
+              tabIndex={0}
+              aria-label="Redo drawing"
+            >
+              <RotateCw className="w-4 h-4" />
+            </Button>
+          </>}
           <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300" />
           {/* Note Color Controls (always visible) */}
           <div className="relative flex items-center gap-2 flex-shrink-0 min-w-0">
@@ -456,6 +515,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
             size="sm"
             className="rounded-md bg-green-300 hover:bg-green-400 text-[#18181b] px-4 h-8 text-base font-semibold shadow transition-all duration-150 border border-green-400"
             style={{ fontFamily: 'inherit', boxShadow: 'none' }}
+            disabled={isSubmitting}
           >
             <Check className="w-4 h-4 mr-1" />
           </Button>
