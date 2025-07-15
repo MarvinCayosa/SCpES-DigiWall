@@ -85,6 +85,52 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
     [note.x, note.y, onMove],
   )
 
+  // Touch support for dragging notes on mobile
+  const handleGlobalTouchMoveRef = useRef<(e: TouchEvent) => void>();
+  const handleGlobalTouchEndRef = useRef<(e: TouchEvent) => void>();
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (e.touches.length !== 1) return;
+    const touch = e.touches[0];
+    window.dispatchEvent(new Event('note-drag-start'));
+    setIsDragging(true);
+    dragStartTime.current = Date.now();
+    setDragStart({
+      x: touch.clientX - note.x,
+      y: touch.clientY - note.y,
+    });
+
+    handleGlobalTouchMoveRef.current = (te: TouchEvent) => {
+      if (te.touches.length !== 1) return;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      animationFrameRef.current = requestAnimationFrame(() => {
+        const t = te.touches[0];
+        const newX = t.clientX - dragStart.x;
+        const newY = t.clientY - dragStart.y;
+        onMove(newX, newY);
+      });
+    };
+    handleGlobalTouchEndRef.current = () => {
+      setIsDragging(false);
+      window.dispatchEvent(new Event('note-drag-end'));
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (handleGlobalTouchMoveRef.current) {
+        document.removeEventListener('touchmove', handleGlobalTouchMoveRef.current, { passive: false } as any);
+      }
+      if (handleGlobalTouchEndRef.current) {
+        document.removeEventListener('touchend', handleGlobalTouchEndRef.current, { passive: false } as any);
+      }
+    };
+    document.addEventListener('touchmove', handleGlobalTouchMoveRef.current!, { passive: false });
+    document.addEventListener('touchend', handleGlobalTouchEndRef.current!, { passive: false });
+  }, [note.x, note.y, onMove]);
+
   const handleEdit = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
@@ -164,6 +210,7 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
         transition: isDragging ? "none" : "all 0.2s ease-out",
       }}
       onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
         onDoubleClick={(e) => {
           // Only trigger onClick if not clicking a control button
           if ((e.target as HTMLElement).closest('.note-control-btn')) return;

@@ -78,6 +78,8 @@ export default function DigitalFreedomWall() {
         createdAt: note.createdAt ? new Date(note.createdAt) : new Date(),
         updatedAt: note.updatedAt ? new Date(note.updatedAt) : new Date(),
       }))
+      // Sort notes by createdAt descending (newest first)
+      notes.sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
       setStickyNotes(notes)
     })
     return () => unsubscribe()
@@ -124,10 +126,10 @@ export default function DigitalFreedomWall() {
         updated[existingIndex] = { ...note, updatedAt: new Date() }
         // Move updated note to end (top)
         const [moved] = updated.splice(existingIndex, 1)
-        updated.push(moved)
+        updated.unshift(moved)
         return updated
       } else {
-        return [...prev, note]
+        return [note, ...prev]
       }
     })
     setIsModalOpen(false)
