@@ -326,8 +326,8 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
         >
           <X className="w-5 h-5" />
         </Button>
-        {/* Main Content - now fills the modal with no inner padding */}
-        <div className="flex-1 relative overflow-hidden">
+        {/* Main Content - now fills the modal with padding */}
+        <div className="flex-1 relative overflow-hidden p-6"> {/* Added p-6 for padding */}
           {/* Drawing Canvas - fills modal */}
           <canvas
             ref={canvasRef}
@@ -364,7 +364,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
               borderRadius: 16,
               overflowX: 'hidden',
               scrollbarWidth: 'thin',
-              padding: 0,
+              padding: 16, // Added padding here
             }}
             onInput={() => {
               updateNote({ text: editorRef.current?.innerHTML || "" });
@@ -381,23 +381,24 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
             </div>
           )}
         </div>
-        {/* Control Panel - below modal */}
-        <div className="mt-6 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-6 py-3 flex flex-nowrap items-center gap-3 z-30 transition-all duration-300 max-w-[95vw] overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ fontFamily: 'inherit', minHeight: 56, overflowY: 'hidden' }}>
-          {/* All children: min-w-0, flex-shrink-0 to prevent wrapping */}
-          {/* Tool Toggle */}
-          <Button
-            variant={currentTool === "text" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setCurrentTool("text")}
+      </div>
+      {/* Toolbar OUTSIDE the modal, below the colored area */}
+      <div className="mt-4 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-6 py-3 flex flex-nowrap items-center gap-3 z-30 transition-all duration-300 max-w-[95vw] overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ fontFamily: 'inherit', minHeight: 56, overflowY: 'hidden' }}>
+        {/* All children: min-w-0, flex-shrink-0 to prevent wrapping */}
+        {/* Tool Toggle */}
+        <Button
+          variant={currentTool === "text" ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setCurrentTool("text")}
           className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "text" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
           style={{ fontFamily: 'inherit' }}
-          >
+        >
           <Type className="w-4 h-4" />
-          </Button>
-          <Button
-            variant={currentTool === "brush" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setCurrentTool("brush")}
+        </Button>
+        <Button
+          variant={currentTool === "brush" ? "secondary" : "ghost"}
+          size="sm"
+          onClick={() => setCurrentTool("brush")}
           className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "brush" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
           style={{ fontFamily: 'inherit' }}
         >
@@ -416,7 +417,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
             <rect x="3" y="13" width="10" height="4" rx="1" fill="#bbb"/>
             <rect x="5" y="3" width="10" height="10" rx="2" fill="#fff" stroke="#bbb" strokeWidth="2"/>
           </svg>
-          </Button>
+        </Button>
         <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300 flex-shrink-0" />
         {/* Text Controls (show only in text mode) */}
         <div className={`flex items-center gap-3 transition-all duration-300 ${currentTool === "text" ? 'opacity-100 max-w-[100vw]' : 'opacity-0 max-w-0 overflow-hidden pointer-events-none'}`} style={{ transition: 'all 0.3s cubic-bezier(.4,0,.2,1)' }}>
@@ -548,7 +549,6 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
           <Check className="w-4 h-4 mr-1" />
         </Button>
       </div>
-    </div>
     </div>
   )
 }
