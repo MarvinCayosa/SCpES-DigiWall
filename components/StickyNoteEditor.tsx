@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Check, Type, Brush, Bold, Italic, Underline, Palette, RotateCcw, RotateCw } from "lucide-react";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { useState as useReactState } from "react";
 
 const FONT_FAMILIES = ["Arial", "Helvetica", "Georgia", "Verdana", "Comic Sans MS"];
 const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32];
@@ -37,6 +36,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [currentTool, setCurrentTool] = useState<ToolType>("text");
   const [brushSize, setBrushSize] = useState(3);
+  const [brushColor, setBrushColor] = useState("#000000"); // Separate brush color state
   const [fontFamily, setFontFamily] = useState("Arial");
   const [fontSize, setFontSize] = useState(24);
   const [textColor, setTextColor] = useState("#000000");
@@ -47,6 +47,21 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Touch drawing state
   const [isTouchDrawing, setIsTouchDrawing] = useState(false);
+
+  // Helper function to determine if a color is light or dark
+  const isLightColor = (color: string): boolean => {
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 140;
+  };
+
+  // Get dynamic placeholder color based on background
+  const getPlaceholderColor = (): string => {
+    return isLightColor(backgroundColor) ? '#555555' : '#dddddd';
+  };
 
   useEffect(() => {
     setEditedNote(initialNote);
@@ -75,6 +90,19 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
       setHistoryStep(-1);
     }
   }, [initialNote, setDrawingHistory, setHistoryStep]);
+
+  // When the eraser tool is selected, clear the canvas
+  useEffect(() => {
+    if (currentTool === "eraser" && canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+      // Also clear drawing history
+      setDrawingHistory([]);
+      setHistoryStep(-1);
+    }
+  }, [currentTool]);
 
   const pushDrawingToHistory = useCallback(() => {
     if (canvasRef.current) {
@@ -106,7 +134,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
           ctx.beginPath();
           ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
           ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, x, y);
-          ctx.strokeStyle = currentTool === "eraser" ? backgroundColor : editedNote.textColor;
+          ctx.strokeStyle = currentTool === "eraser" ? backgroundColor : brushColor;
           ctx.lineWidth = brushSize * (currentTool === "eraser" ? 3 : 1);
           ctx.lineCap = "round";
           ctx.globalCompositeOperation = "source-over";
@@ -114,7 +142,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
         }
         lastPoint.current = { x, y };
       }
-    }, [isDrawing, currentTool, brushSize, editedNote.textColor, backgroundColor]);
+    }, [isDrawing, currentTool, brushSize, brushColor, backgroundColor]);
   const startDrawing = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (currentTool !== "brush" && currentTool !== "eraser") return;
     setIsDrawing(true);
@@ -172,7 +200,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
         ctx.beginPath();
         ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
         ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, x, y);
-        ctx.strokeStyle = currentTool === "eraser" ? backgroundColor : editedNote.textColor;
+        ctx.strokeStyle = currentTool === "eraser" ? backgroundColor : brushColor;
         ctx.lineWidth = brushSize * (currentTool === "eraser" ? 3 : 1);
         ctx.lineCap = "round";
         ctx.globalCompositeOperation = "source-over";
@@ -180,7 +208,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
       }
       lastPoint.current = { x, y };
     }
-  }, [isTouchDrawing, currentTool, brushSize, editedNote.textColor, backgroundColor]);
+  }, [isTouchDrawing, currentTool, brushSize, brushColor, backgroundColor]);
   const startTouchDrawing = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
     if (currentTool !== "brush" && currentTool !== "eraser") return;
     setIsTouchDrawing(true);
@@ -337,15 +365,13 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
         />
         {(!editedNote.text || editedNote.text === '<br>') && (
           <div
-            className="absolute inset-0 z-0 pointer-events-none select-none p-2 text-lg"
+            className="absolute top-1 left-1 z-0 pointer-events-none select-none animate-fadeInOut"
             style={{
-              color: '#222',
+              color: getPlaceholderColor(),
               fontFamily: 'inherit',
-              padding: mobile ? 16 : undefined,
-              background: 'rgba(255,255,255,0.35)',
-              borderRadius: 8,
+              fontSize: fontSize || 24,
+              padding: mobile ? '12px' : '4px',
               opacity: 0.7,
-              mixBlendMode: 'multiply',
             }}
           >
             Write your message...
@@ -355,84 +381,109 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
       {mobile ? (
         <div className="mt-4 flex flex-col gap-2 w-full">
           {/* First row: tool selection, font, text controls, note color */}
-          <div className="bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-3 py-2 flex flex-nowrap items-center gap-2 z-30 transition-all duration-300 max-w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ fontFamily: 'inherit', minHeight: 40, overflowY: 'hidden', fontSize: '12px' }}>
-            <Button variant={currentTool === "text" ? "secondary" : "ghost"} size="icon" onClick={() => setCurrentTool("text")} className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "text" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`} style={{ fontFamily: 'inherit', fontSize: '12px' }}><Type className="w-3 h-3" /></Button>
-            <Button variant={currentTool === "brush" ? "secondary" : "ghost"} size="icon" onClick={() => setCurrentTool("brush")} className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "brush" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`} style={{ fontFamily: 'inherit', fontSize: '12px' }}><Brush className="w-3 h-3" /></Button>
-            <Button
-              variant={currentTool === "eraser" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setCurrentTool("eraser")}
-              className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "eraser" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
-              style={{ fontFamily: 'inherit', fontSize: '12px' }}
-              aria-label="Eraser"
-            >
-              {/* Classic eraser SVG icon */}
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <rect x="3" y="13" width="10" height="4" rx="1" fill="#bbb"/>
-                <rect x="5" y="3" width="10" height="10" rx="2" fill="#fff" stroke="#bbb" strokeWidth="2"/>
-              </svg>
-            </Button>
-            <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300 flex-shrink-0" />
-            {/* Text controls: only show in text mode */}
-            {currentTool === "text" && <>
-              <Select value={fontFamily} onValueChange={value => { exec('fontName', value); setFontFamily(value); updateNote({ fontFamily: value }); }}>
-                <SelectTrigger className="w-16 h-7 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontFamily: fontFamily, fontSize: '12px' }}><span style={{ fontFamily: fontFamily }}>{fontFamily}</span></SelectTrigger>
-                <SelectContent>{FONT_FAMILIES.map((font) => (<SelectItem key={font} value={font} className="text-xs" style={{ fontFamily: font, fontWeight: fontFamily === font ? 'bold' : 'normal', fontSize: '12px' }}>{font}</SelectItem>))}</SelectContent>
-              </Select>
-              {/* --- MOBILE TOOLBAR FONT SIZE DROPDOWN --- */}
-              <Select value={fontSize.toString()} onValueChange={value => { const size = FONT_SIZES[parseInt(value)-1] || 16; exec('fontSize', value); setFontSize(size); updateNote({ fontSize: size }); }}>
-                <SelectTrigger className="w-14 h-7 text-xs bg-gray-800 border-gray-700 text-white font-normal rounded-full flex items-center justify-between" style={{ fontSize: '12px', letterSpacing: '0.01em' }}><span>{fontSize}</span></SelectTrigger>
-                <SelectContent>{FONT_SIZES.map((size, idx) => (<SelectItem key={size} value={(idx+1).toString()} className="text-xs" style={{ fontSize: '12px' }}>{size}</SelectItem>))}</SelectContent>
-              </Select>
-              <Button variant="ghost" size="icon" onClick={() => exec('bold')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Bold className="w-3 h-3" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => exec('italic')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Italic className="w-3 h-3" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => exec('underline')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Underline className="w-3 h-3" /></Button>
-              <div className="flex items-center gap-2 relative z-[201]">
-                <ColorPickerPopover value={textColor} onChange={color => { if (currentTool === "text") { exec('foreColor', color); setTextColor(color); updateNote({ textColor: color }); } else { setTextColor(color); updateNote({ textColor: color }); } }} label="Font color" colors={["#222222", "#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#6554C0", "#FFFFFF"]} />
-              </div>
-            </>}
-            {/* Brush controls: only show in brush mode */}
-            {currentTool === "brush" && <>
-              <span className="text-xs text-white">Brush</span>
-              <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} className="w-32 brush-slider" />
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-white">Color</span>
-                <input
-                  type="color"
-                  value={textColor}
-                  onChange={(e) => { setTextColor(e.target.value); updateNote({ textColor: e.target.value }); }}
-                  className="w-8 h-8 rounded-full border-2 border-gray-300 cursor-pointer"
-                  style={{ fontFamily: 'inherit' }}
-                />
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => { if (historyStep > 0) setHistoryStep((prev) => prev - 1); }}
-                className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
-                style={{ fontFamily: 'inherit', fontSize: '12px' }}
-                disabled={historyStep <= 0}
-                tabIndex={0}
-                aria-label="Undo drawing"
-              >
-                <RotateCcw className="w-3 h-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => { if (historyStep < drawingHistory.length - 1) setHistoryStep((prev) => prev + 1); }}
-                className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
-                style={{ fontFamily: 'inherit', fontSize: '12px' }}
-                disabled={historyStep >= drawingHistory.length - 1}
-                tabIndex={0}
-                aria-label="Redo drawing"
-              >
-                <RotateCw className="w-3 h-3" />
-              </Button>
-            </>}
-            {/* Note Color Picker always visible */}
-            <div className="relative flex items-center gap-2 flex-shrink-0 min-w-0 ml-2">
-              <ColorPickerPopover value={backgroundColor} onChange={color => { setBackgroundColor(color); updateNote({ backgroundColor: color }); }} label="Sticky note color" />
+          <div className="bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-3 py-2 flex flex-nowrap items-center gap-2 z-30 transition-all duration-300 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent overflow-x-auto overflow-y-hidden" style={{ fontFamily: 'inherit', minHeight: 40, fontSize: '12px', width: '100%', maxWidth: '95vw', scrollbarWidth: 'thin', scrollbarColor: '#374151 transparent' }}>
+            {/* Fixed width container to prevent layout shifts */}
+            <div className="flex items-center gap-2 min-w-max">
+                              {/* Tool Toggle */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button variant={currentTool === "text" ? "secondary" : "ghost"} size="icon" onClick={() => setCurrentTool("text")} className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "text" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`} style={{ fontFamily: 'inherit', fontSize: '12px' }}><Type className="w-3 h-3" /></Button>
+                  <Button variant={currentTool === "brush" ? "secondary" : "ghost"} size="icon" onClick={() => setCurrentTool("brush")} className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "brush" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`} style={{ fontFamily: 'inherit', fontSize: '12px' }}><Brush className="w-3 h-3" /></Button>
+                  <Button
+                    variant={currentTool === "eraser" ? "secondary" : "ghost"}
+                    size="icon"
+                    onClick={() => setCurrentTool("eraser")}
+                    className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "eraser" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
+                    style={{ fontFamily: 'inherit', fontSize: '12px' }}
+                    aria-label="Eraser"
+                  >
+                    {/* Improved eraser SVG icon */}
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-current">
+                      <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879Z" fill="currentColor" opacity="0.3"/>
+                      <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                      <path d="m4 11 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                  </Button>
+                </div>
+                
+                {/* Separator */}
+                <div className="w-px h-6 bg-gray-700 flex-shrink-0" />
+                
+                {/* Tool-specific controls */}
+                {/* Text controls: only show in text mode */}
+                {currentTool === "text" && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <Select value={fontFamily} onValueChange={value => { exec('fontName', value); setFontFamily(value); updateNote({ fontFamily: value }); }}>
+                      <SelectTrigger className="w-16 h-7 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontFamily: fontFamily, fontSize: '12px' }}><span style={{ fontFamily: fontFamily }}>{fontFamily}</span></SelectTrigger>
+                      <SelectContent>{FONT_FAMILIES.map((font) => (<SelectItem key={font} value={font} className="text-xs" style={{ fontFamily: font, fontWeight: fontFamily === font ? 'bold' : 'normal', fontSize: '12px' }}>{font}</SelectItem>))}</SelectContent>
+                    </Select>
+                    <Select value={fontSize.toString()} onValueChange={value => { const size = FONT_SIZES[parseInt(value)-1] || 16; exec('fontSize', value); setFontSize(size); updateNote({ fontSize: size }); }}>
+                      <SelectTrigger className="w-14 h-7 text-xs bg-gray-800 border-gray-700 text-white font-normal rounded-full flex items-center justify-between" style={{ fontSize: '12px', letterSpacing: '0.01em' }}><span>{fontSize}</span></SelectTrigger>
+                      <SelectContent>{FONT_SIZES.map((size, idx) => (<SelectItem key={size} value={(idx+1).toString()} className="text-xs" style={{ fontSize: '12px' }}>{size}</SelectItem>))}</SelectContent>
+                    </Select>
+                    <Button variant="ghost" size="icon" onClick={() => exec('bold')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Bold className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => exec('italic')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Italic className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => exec('underline')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Underline className="w-3 h-3" /></Button>
+                    <div className="flex items-center gap-2 relative z-[201]">
+                      <ColorPickerPopover value={textColor} onChange={color => { if (currentTool === "text") { exec('foreColor', color); setTextColor(color); updateNote({ textColor: color }); } else { setTextColor(color); updateNote({ textColor: color }); } }} label="Font color" colors={["#222222", "#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#6554C0", "#FFFFFF"]} />
+                    </div>
+                  </div>
+                )}
+                {/* Brush controls: only show in brush mode */}
+                {currentTool === "brush" && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-white">Brush</span>
+                    <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} className="w-24 brush-slider" />
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-white">Color</span>
+                      <input
+                        type="color"
+                        value={brushColor}
+                        onChange={(e) => setBrushColor(e.target.value)}
+                        className="w-6 h-6 rounded-full border-2 border-gray-300 cursor-pointer"
+                        style={{ fontFamily: 'inherit' }}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => { if (historyStep > 0) setHistoryStep((prev) => prev - 1); }}
+                      className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
+                      style={{ fontFamily: 'inherit', fontSize: '12px' }}
+                      disabled={historyStep <= 0}
+                      tabIndex={0}
+                      aria-label="Undo drawing"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => { if (historyStep < drawingHistory.length - 1) setHistoryStep((prev) => prev + 1); }}
+                      className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
+                      style={{ fontFamily: 'inherit', fontSize: '12px' }}
+                      disabled={historyStep >= drawingHistory.length - 1}
+                      tabIndex={0}
+                      aria-label="Redo drawing"
+                    >
+                      <RotateCw className="w-3 h-3" />
+                    </Button>
+                  </div>
+                )}
+                {/* Eraser mode: show minimal controls */}
+                {currentTool === "eraser" && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-xs text-white">Eraser Active</span>
+                    <span className="text-xs text-white opacity-75">Click to clear all drawings</span>
+                  </div>
+                )}
+                
+                {/* Separator */}
+                <div className="w-px h-6 bg-gray-700 flex-shrink-0" />
+                
+                {/* Note Color Picker */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <ColorPickerPopover value={backgroundColor} onChange={color => { setBackgroundColor(color); updateNote({ backgroundColor: color }); }} label="Sticky note color" />
+                </div>
             </div>
           </div>
           {/* Second row: only the Send button, centered and lower */}
@@ -464,157 +515,184 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
         </div>
       ) : (
         // Desktop: keep single row toolbar as before
-        <div className="mt-4 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-6 py-3 flex flex-nowrap items-center gap-3 z-30 transition-all duration-300 max-w-[95vw] overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ fontFamily: 'inherit', minHeight: 56, overflowY: 'hidden' }}>
-          {/* Tool Toggle */}
-          <Button
-            variant={currentTool === "text" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setCurrentTool("text")}
-            className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "text" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
-            style={{ fontFamily: 'inherit' }}
-          >
-            <Type className="w-4 h-4" />
-          </Button>
-          <Button
-            variant={currentTool === "brush" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setCurrentTool("brush")}
-            className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "brush" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
-            style={{ fontFamily: 'inherit' }}
-          >
-            <Brush className="w-4 h-4" />
-          </Button>
-          <Button
-            variant={currentTool === "eraser" ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setCurrentTool("eraser")}
-            className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "eraser" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
-            style={{ fontFamily: 'inherit' }}
-          >
-            <Brush className="w-4 h-4" />
-          </Button>
-          {/* Text Controls (show only in text mode) */}
-          {currentTool === "text" && <>
-            <Select value={fontFamily} onValueChange={value => { exec('fontName', value); setFontFamily(value); updateNote({ fontFamily: value }); }}>
-              <SelectTrigger className="w-28 h-8 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontFamily: fontFamily }}>
-                <span style={{ fontFamily: fontFamily }}>{fontFamily}</span>
-              </SelectTrigger>
-              <SelectContent>
-                {FONT_FAMILIES.map((font) => (
-                  <SelectItem key={font} value={font} className="text-xs" style={{ fontFamily: font, fontWeight: fontFamily === font ? 'bold' : 'normal' }}>{font}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {/* --- DESKTOP TOOLBAR FONT SIZE DROPDOWN --- */}
-            <Select value={fontSize.toString()} onValueChange={value => { const size = FONT_SIZES[parseInt(value)-1] || 16; exec('fontSize', value); setFontSize(size); updateNote({ fontSize: size }); }}>
-              <SelectTrigger className="w-20 h-8 text-xs bg-gray-800 border-gray-700 text-white font-normal rounded-full flex items-center justify-between" style={{ fontSize: '12px', letterSpacing: '0.01em' }}><span>{fontSize}</span></SelectTrigger>
-              <SelectContent>{FONT_SIZES.map((size, idx) => (<SelectItem key={size} value={(idx+1).toString()} className="text-xs" style={{ fontSize: '12px' }}>{size}</SelectItem>))}</SelectContent>
-            </Select>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => exec('bold')}
-              className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150"
-              style={{ fontFamily: 'inherit' }}
-            >
-              <Bold className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => exec('italic')}
-              className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150"
-              style={{ fontFamily: 'inherit' }}
-            >
-              <Italic className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => exec('underline')}
-              className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150"
-              style={{ fontFamily: 'inherit' }}
-            >
-              <Underline className="w-4 h-4" />
-            </Button>
-            {/* Text Color Picker */}
-            <div className="flex items-center gap-2 relative z-[201]">
-              <span className="text-xs text-white">Text</span>
-              <ColorPickerPopover
-                value={textColor}
-                onChange={color => {
-                  if (currentTool === "text") {
-                    exec('foreColor', color);
-                    setTextColor(color);
-                    updateNote({ textColor: color });
-                  } else {
-                    setTextColor(color);
-                    updateNote({ textColor: color });
-                  }
-                }}
-                label="Font color"
-                colors={["#222222", "#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#6554C0", "#FFFFFF"]}
-              />
-            </div>
-          </>}
-          {/* Brush Controls (show only in brush mode) */}
-          {currentTool === "brush" && <>
-            <span className="text-xs text-white">Brush</span>
-            <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} className="w-32 brush-slider" />
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-white">Color</span>
-              <input
-                type="color"
-                value={textColor}
-                onChange={(e) => { setTextColor(e.target.value); updateNote({ textColor: e.target.value }); }}
-                className="w-8 h-8 rounded-full border-2 border-gray-300 cursor-pointer"
+        <div className="mt-4 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-6 py-3 z-30 transition-all duration-300 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ fontFamily: 'inherit', minHeight: 56, width: '900px', maxWidth: '95vw' }}>
+          {/* Fixed width container to prevent layout shifts */}
+          <div className="flex items-center justify-between w-full">
+            {/* Left section: Tool Toggle */}
+            <div className="flex items-center gap-3">
+              <Button
+                variant={currentTool === "text" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setCurrentTool("text")}
+                className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "text" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
                 style={{ fontFamily: 'inherit' }}
-              />
+              >
+                <Type className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={currentTool === "brush" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setCurrentTool("brush")}
+                className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "brush" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
+                style={{ fontFamily: 'inherit' }}
+              >
+                <Brush className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={currentTool === "eraser" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setCurrentTool("eraser")}
+                className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "eraser" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
+                style={{ fontFamily: 'inherit' }}
+                aria-label="Eraser"
+              >
+                {/* Improved eraser SVG icon */}
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-current">
+                  <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879Z" fill="currentColor" opacity="0.3"/>
+                  <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                  <path d="m4 11 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </Button>
+              <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300" />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { if (historyStep > 0) setHistoryStep((prev) => prev - 1); }}
-              className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
-              style={{ fontFamily: 'inherit' }}
-              disabled={historyStep <= 0}
-              tabIndex={0}
-              aria-label="Undo drawing"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => { if (historyStep < drawingHistory.length - 1) setHistoryStep((prev) => prev + 1); }}
-              className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
-              style={{ fontFamily: 'inherit' }}
-              disabled={historyStep >= drawingHistory.length - 1}
-              tabIndex={0}
-              aria-label="Redo drawing"
-            >
-              <RotateCw className="w-4 h-4" />
-            </Button>
-          </>}
-          <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300" />
-          {/* Note Color Controls (always visible) */}
-          <div className="relative flex items-center gap-2 flex-shrink-0 min-w-0">
-            <ColorPickerPopover
-              value={backgroundColor}
-              onChange={color => { setBackgroundColor(color); updateNote({ backgroundColor: color }); }}
-              label="Sticky note color"
-            />
+            {/* Center section: Tool-specific controls with fixed width container */}
+            <div className="flex-1 flex items-center justify-center" style={{ minWidth: '400px' }}>
+              {/* Text Controls (show only in text mode) */}
+              {currentTool === "text" && (
+                <div className="flex items-center gap-3">
+                  <Select value={fontFamily} onValueChange={value => { exec('fontName', value); setFontFamily(value); updateNote({ fontFamily: value }); }}>
+                    <SelectTrigger className="w-28 h-8 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontFamily: fontFamily }}>
+                      <span style={{ fontFamily: fontFamily }}>{fontFamily}</span>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FONT_FAMILIES.map((font) => (
+                        <SelectItem key={font} value={font} className="text-xs" style={{ fontFamily: font, fontWeight: fontFamily === font ? 'bold' : 'normal' }}>{font}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={fontSize.toString()} onValueChange={value => { const size = FONT_SIZES[parseInt(value)-1] || 16; exec('fontSize', value); setFontSize(size); updateNote({ fontSize: size }); }}>
+                    <SelectTrigger className="w-20 h-8 text-xs bg-gray-800 border-gray-700 text-white font-normal rounded-full flex items-center justify-between" style={{ fontSize: '12px', letterSpacing: '0.01em' }}><span>{fontSize}</span></SelectTrigger>
+                    <SelectContent>{FONT_SIZES.map((size, idx) => (<SelectItem key={size} value={(idx+1).toString()} className="text-xs" style={{ fontSize: '12px' }}>{size}</SelectItem>))}</SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => exec('bold')}
+                    className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150"
+                    style={{ fontFamily: 'inherit' }}
+                  >
+                    <Bold className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => exec('italic')}
+                    className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150"
+                    style={{ fontFamily: 'inherit' }}
+                  >
+                    <Italic className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => exec('underline')}
+                    className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150"
+                    style={{ fontFamily: 'inherit' }}
+                  >
+                    <Underline className="w-4 h-4" />
+                  </Button>
+                  {/* Text Color Picker */}
+                  <div className="flex items-center gap-2 relative z-[201]">
+                    <span className="text-xs text-white">Text</span>
+                    <ColorPickerPopover
+                      value={textColor}
+                      onChange={color => {
+                        if (currentTool === "text") {
+                          exec('foreColor', color);
+                          setTextColor(color);
+                          updateNote({ textColor: color });
+                        } else {
+                          setTextColor(color);
+                          updateNote({ textColor: color });
+                        }
+                      }}
+                      label="Font color"
+                      colors={["#222222", "#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#6554C0", "#FFFFFF"]}
+                    />
+                  </div>
+                </div>
+              )}
+              {/* Brush Controls (show only in brush mode) */}
+              {currentTool === "brush" && (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-white">Brush</span>
+                  <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} className="w-32 brush-slider" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-white">Color</span>
+                    <input
+                      type="color"
+                      value={brushColor}
+                      onChange={(e) => setBrushColor(e.target.value)}
+                      className="w-8 h-8 rounded-full border-2 border-gray-300 cursor-pointer"
+                      style={{ fontFamily: 'inherit' }}
+                    />
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { if (historyStep > 0) setHistoryStep((prev) => prev - 1); }}
+                    className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
+                    style={{ fontFamily: 'inherit' }}
+                    disabled={historyStep <= 0}
+                    tabIndex={0}
+                    aria-label="Undo drawing"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { if (historyStep < drawingHistory.length - 1) setHistoryStep((prev) => prev + 1); }}
+                    className="rounded-md w-8 h-8 p-0 text-white hover:bg-gray-700 transition-all duration-150 flex-shrink-0"
+                    style={{ fontFamily: 'inherit' }}
+                    disabled={historyStep >= drawingHistory.length - 1}
+                    tabIndex={0}
+                    aria-label="Redo drawing"
+                  >
+                    <RotateCw className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+              {/* Eraser mode: show minimal controls */}
+              {currentTool === "eraser" && (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-white">Eraser Active</span>
+                  <span className="text-xs text-white opacity-75">Click to clear all drawings</span>
+                </div>
+              )}
+            </div>
+            {/* Right section: Note Color and Save */}
+            <div className="flex items-center gap-3">
+              <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300" />
+              <div className="relative flex items-center gap-2 flex-shrink-0 min-w-0">
+                <ColorPickerPopover
+                  value={backgroundColor}
+                  onChange={color => { setBackgroundColor(color); updateNote({ backgroundColor: color }); }}
+                  label="Sticky note color"
+                />
+              </div>
+              <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300" />
+              <Button
+                onClick={handleSave}
+                size="sm"
+                className="rounded-md bg-green-300 hover:bg-green-400 text-[#18181b] px-4 h-8 text-base font-semibold shadow transition-all duration-150 border border-green-400"
+                style={{ fontFamily: 'inherit', boxShadow: 'none' }}
+                disabled={isSubmitting || (isTextEmpty() && !hasDrawing())}
+              >
+                <Check className="w-4 h-4 mr-1" />
+              </Button>
+            </div>
           </div>
-          <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300" />
-          <Button
-            onClick={handleSave}
-            size="sm"
-            className="rounded-md bg-green-300 hover:bg-green-400 text-[#18181b] px-4 h-8 text-base font-semibold shadow transition-all duration-150 border border-green-400"
-            style={{ fontFamily: 'inherit', boxShadow: 'none' }}
-            disabled={isSubmitting || (isTextEmpty() && !hasDrawing())}
-          >
-            <Check className="w-4 h-4 mr-1" />
-          </Button>
         </div>
       )}
     </div>
@@ -652,7 +730,7 @@ function ColorPickerPopover({ value, onChange, colors = COMMON_COLORS, label = "
           <input
             type="color"
             value={custom}
-            onChange={e => { setCustom(e.target.value); onChange(e.target.value); }}
+            onChange={(e) => { setCustom(e.target.value); onChange(e.target.value); }}
             className="w-7 h-7 rounded-full border-2 border-gray-300 cursor-pointer align-middle"
             aria-label="Custom color"
             style={{ verticalAlign: 'middle' }}

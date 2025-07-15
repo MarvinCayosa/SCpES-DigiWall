@@ -57,6 +57,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
   const editorRef = useRef<HTMLDivElement>(null)
   const [currentTool, setCurrentTool] = useState<ToolType>("text")
   const [brushSize, setBrushSize] = useState(3)
+  const [brushColor, setBrushColor] = useState("#000000") // Separate brush color state
   const [showColorPalette, setShowColorPalette] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [isDrawing, setIsDrawing] = useState(false)
@@ -72,6 +73,21 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
 
   const isMobile = useIsMobile();
+
+  // Helper function to determine if a color is light or dark
+  const isLightColor = (color: string): boolean => {
+    const hex = color.replace('#', '');
+    const r = parseInt(hex.substr(0, 2), 16);
+    const g = parseInt(hex.substr(2, 2), 16);
+    const b = parseInt(hex.substr(4, 2), 16);
+    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness > 140;
+  };
+
+  // Get dynamic placeholder color based on background
+  const getPlaceholderColor = (): string => {
+    return isLightColor(editedNote.backgroundColor) ? '#555555' : '#dddddd';
+  };
 
   useEffect(() => {
     setEditedNote(note)
@@ -240,7 +256,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
           ctx.beginPath();
           ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
           ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, x, y);
-          ctx.strokeStyle = currentTool === "eraser" ? editedNote.backgroundColor : editedNote.textColor;
+          ctx.strokeStyle = currentTool === "eraser" ? editedNote.backgroundColor : brushColor;
           ctx.lineWidth = brushSize * (currentTool === "eraser" ? 3 : 1);
           ctx.lineCap = "round";
           ctx.globalCompositeOperation = "source-over";
@@ -248,7 +264,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
         }
         lastPoint.current = { x, y };
       }
-    }, [isDrawing, currentTool, brushSize, editedNote.textColor, editedNote.backgroundColor]);
+    }, [isDrawing, currentTool, brushSize, brushColor, editedNote.backgroundColor]);
 
   const clearCanvas = () => {
     const canvas = canvasRef.current
@@ -291,7 +307,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
         ctx.beginPath();
         ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
         ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, x, y);
-        ctx.strokeStyle = currentTool === "eraser" ? editedNote.backgroundColor : editedNote.textColor;
+        ctx.strokeStyle = currentTool === "eraser" ? editedNote.backgroundColor : brushColor;
         ctx.lineWidth = brushSize * (currentTool === "eraser" ? 3 : 1);
         ctx.lineCap = "round";
         ctx.globalCompositeOperation = "source-over";
@@ -299,7 +315,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
       }
       lastPoint.current = { x, y };
     }
-  }, [isTouchDrawing, currentTool, brushSize, editedNote.textColor, editedNote.backgroundColor]);
+  }, [isTouchDrawing, currentTool, brushSize, brushColor, editedNote.backgroundColor]);
   const stopTouchDrawing = useCallback(() => {
     setIsTouchDrawing(false);
     lastPoint.current = null;
@@ -393,16 +409,216 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
           />
           {/* Custom placeholder for contenteditable */}
           {(!editedNote.text || editedNote.text === '<br>') && (
-            <div className="absolute inset-0 z-0 pointer-events-none text-gray-400 select-none p-2 text-lg flex items-center justify-center" style={{fontFamily: 'inherit'}}>
+            <div 
+              className="absolute top-1 left-1 z-0 pointer-events-none select-none animate-fadeInOut"
+              style={{
+                fontFamily: 'inherit',
+                fontSize: editedNote.fontSize || 24,
+                padding: '4px',
+                opacity: 0.7,
+                color: getPlaceholderColor(),
+              }}
+            >
               Write your message...
             </div>
           )}
         </div>
       </div>
-      {/* Toolbar OUTSIDE the modal, no horizontal scroll, wraps if needed */}
-      <div className="mt-4 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-6 py-3 flex flex-wrap items-center gap-3 z-30 transition-all duration-300 max-w-[95vw]" style={{ fontFamily: 'inherit', minHeight: 56, overflowY: 'hidden' }}>
-        {/* All children: min-w-0, flex-shrink-0 to prevent wrapping */}
-        {/* Tool Toggle */}
+      {/* Toolbar OUTSIDE the modal, responsive design */}
+      <div className={`mt-4 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl z-30 transition-all duration-300 ${isMobile ? 'px-4 py-3 overflow-x-auto' : 'px-6 py-3'}`} style={{ fontFamily: 'inherit', minHeight: isMobile ? 'auto' : 56, width: isMobile ? '100%' : '800px', maxWidth: '95vw' }}>
+        {isMobile ? (
+          /* Mobile: Single row horizontally scrollable */
+          <div className="flex items-center gap-3 min-w-max">
+            {/* Tool selection */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant={currentTool === "text" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setCurrentTool("text")}
+                className={`rounded-lg w-10 h-10 p-0 transition-all duration-150 ${currentTool === "text" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"}`}
+              >
+                <Type className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={currentTool === "brush" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setCurrentTool("brush")}
+                className={`rounded-lg w-10 h-10 p-0 transition-all duration-150 ${currentTool === "brush" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"}`}
+              >
+                <Brush className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={currentTool === "eraser" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setCurrentTool("eraser")}
+                className={`rounded-lg w-10 h-10 p-0 transition-all duration-150 ${currentTool === "eraser" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"}`}
+                aria-label="Eraser"
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-current">
+                  <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879Z" fill="currentColor" opacity="0.3"/>
+                  <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                  <path d="m4 11 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+              </Button>
+            </div>
+            
+            {/* Tool-specific controls */}
+            {currentTool === "text" && (
+              <div className="flex items-center gap-3">
+                <Select value={editedNote.fontFamily} onValueChange={value => { exec('fontName', value); updateNote({ fontFamily: value }); }}>
+                  <SelectTrigger className="w-24 h-9 text-sm bg-gray-800 border-gray-700 text-white font-medium rounded-lg">
+                    <span style={{ fontFamily: editedNote.fontFamily }}>{editedNote.fontFamily}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_FAMILIES.map((font) => (
+                      <SelectItem key={font} value={font} className="text-sm" style={{ fontFamily: font }}>
+                        {font}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Select value={editedNote.fontSize.toString()} onValueChange={value => { const size = FONT_SIZES[parseInt(value)-1] || 16; exec('fontSize', value); updateNote({ fontSize: size }); }}>
+                  <SelectTrigger className="w-16 h-9 text-sm bg-gray-800 border-gray-700 text-white font-medium rounded-lg">
+                    <span>{editedNote.fontSize}</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FONT_SIZES.map((size, idx) => (
+                      <SelectItem key={size} value={(idx+1).toString()} className="text-sm">
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => exec('bold')}
+                    className="w-9 h-9 p-0 text-white hover:bg-gray-700 rounded-lg"
+                  >
+                    <Bold className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => exec('italic')}
+                    className="w-9 h-9 p-0 text-white hover:bg-gray-700 rounded-lg"
+                  >
+                    <Italic className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => exec('underline')}
+                    className="w-9 h-9 p-0 text-white hover:bg-gray-700 rounded-lg"
+                  >
+                    <Underline className="w-4 h-4" />
+                  </Button>
+                </div>
+                
+                <ColorPickerPopover
+                  value={editedNote.textColor}
+                  onChange={color => {
+                    if (currentTool === "text") {
+                      exec('foreColor', color);
+                      updateNote({ textColor: color });
+                    }
+                  }}
+                  label="Text color"
+                  colors={["#000000", "#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#6554C0", "#FFFFFF"]}
+                />
+              </div>
+            )}
+            
+            {currentTool === "brush" && (
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-white">Size</span>
+                  <Slider 
+                    min={1} 
+                    max={20} 
+                    step={1} 
+                    value={[brushSize]} 
+                    onValueChange={([v]) => setBrushSize(v)} 
+                    className="w-24"
+                  />
+                  <span className="text-xs text-white/70 w-6">{brushSize}</span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-white">Color</span>
+                  <input
+                    type="color"
+                    value={brushColor}
+                    onChange={(e) => setBrushColor(e.target.value)}
+                    className="w-8 h-8 rounded-lg border-2 border-gray-600 cursor-pointer"
+                  />
+                </div>
+                
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { if (historyStep > 0) setHistoryStep((prev) => prev - 1); }}
+                    className="w-9 h-9 p-0 text-white hover:bg-gray-700 rounded-lg"
+                    disabled={historyStep <= 0}
+                    aria-label="Undo"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => { if (historyStep < drawingHistory.length - 1) setHistoryStep((prev) => prev + 1); }}
+                    className="w-9 h-9 p-0 text-white hover:bg-gray-700 rounded-lg"
+                    disabled={historyStep >= drawingHistory.length - 1}
+                    aria-label="Redo"
+                  >
+                    <RotateCw className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {currentTool === "eraser" && (
+              <div className="flex items-center gap-2 text-white/70">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-current">
+                  <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879Z" fill="currentColor" opacity="0.3"/>
+                  <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                  <path d="m4 11 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                <span className="text-sm">Eraser mode active</span>
+              </div>
+            )}
+            
+            {/* Note color picker */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-white/70">Note</span>
+              <ColorPickerPopover
+                value={editedNote.backgroundColor}
+                onChange={color => updateNote({ backgroundColor: color })}
+                label="Note color"
+              />
+            </div>
+            
+            {/* Save button */}
+            <Button
+              onClick={handleSave}
+              size="sm"
+              className="rounded-lg bg-green-500 hover:bg-green-600 text-white px-4 h-9 text-sm font-semibold shadow-lg transition-all duration-150"
+              disabled={(() => { const html = editorRef.current?.innerHTML || ''; const textEmpty = !html || html === '<br>' || html.replace(/<[^>]+>/g, '').trim() === ''; let drawing = false; if (canvasRef.current) { const ctx = canvasRef.current.getContext('2d'); if (ctx) { const pixelData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height); drawing = pixelData.data.some((channel, index) => index % 4 === 3 && channel > 0); } } return textEmpty && !drawing; })()}
+            >
+              <Check className="w-3 h-3 mr-1" />
+              Save
+            </Button>
+          </div>
+        ) : (
+          /* Desktop: Fixed width container layout */
+          <div className="flex items-center justify-between w-full">
+            {/* Left section: Tool Toggle */}
+            <div className="flex items-center gap-3">
         <Button
           variant={currentTool === "text" ? "secondary" : "ghost"}
           size="sm"
@@ -429,15 +645,20 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
           style={{ fontFamily: 'inherit' }}
           aria-label="Eraser"
         >
-          {/* Classic eraser SVG icon */}
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <rect x="3" y="13" width="10" height="4" rx="1" fill="#bbb"/>
-            <rect x="5" y="3" width="10" height="10" rx="2" fill="#fff" stroke="#bbb" strokeWidth="2"/>
+                {/* Improved eraser SVG icon */}
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-current">
+                  <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879Z" fill="currentColor" opacity="0.3"/>
+                  <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879Z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+                  <path d="m4 11 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
         </Button>
-        <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300 flex-shrink-0" />
+              <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300" />
+            </div>
+            {/* Center section: Tool-specific controls with fixed width container */}
+            <div className="flex-1 flex items-center justify-center" style={{ minWidth: '400px' }}>
         {/* Text Controls (show only in text mode) */}
-        <div className={`flex items-center gap-3 transition-all duration-300 ${currentTool === "text" ? 'opacity-100 max-w-[100vw]' : 'opacity-0 max-w-0 overflow-hidden pointer-events-none'}`} style={{ transition: 'all 0.3s cubic-bezier(.4,0,.2,1)' }}>
+              {currentTool === "text" && (
+                <div className="flex items-center gap-3">
           <Select value={editedNote.fontFamily} onValueChange={value => { exec('fontName', value); updateNote({ fontFamily: value }); }}>
             <SelectTrigger className="w-28 h-8 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontFamily: editedNote.fontFamily }}>
               <span style={{ fontFamily: editedNote.fontFamily }}>{editedNote.fontFamily}</span>
@@ -503,36 +724,22 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
             />
           </div>
         </div>
+              )}
         {/* Brush Controls (show only in brush mode) */}
-        <div className={`flex items-center gap-3 transition-all duration-300 ${currentTool === "brush" ? 'opacity-100 max-w-[100vw]' : 'opacity-0 max-w-0 overflow-hidden pointer-events-none'}`} style={{ transition: 'all 0.3s cubic-bezier(.4,0,.2,1)' }}>
+              {currentTool === "brush" && (
+                <div className="flex items-center gap-3">
           <span className="text-xs text-white">Brush</span>
-          {isMobile ? (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button size="sm" variant="ghost" className="rounded-md w-8 h-8 p-0 text-white border border-gray-700 flex items-center justify-center" aria-label="Brush size">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#fff" strokeWidth="2" fill="#222" /><circle cx="10" cy="10" r="{brushSize}" fill="#fff" /></svg>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent side="top" align="center" className="p-4 flex flex-col items-center z-[300]">
-                <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} orientation="vertical" className="h-32" />
-              </PopoverContent>
-            </Popover>
-          ) : (
             <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} className="w-32 brush-slider" />
-          )}
           <div className="flex items-center gap-2">
             <span className="text-xs text-white">Color</span>
             <input
               type="color"
-              value={editedNote.textColor}
-              onChange={(e) => updateNote({ textColor: e.target.value })}
+              value={brushColor}
+              onChange={(e) => setBrushColor(e.target.value)}
               className="w-8 h-8 rounded-full border-2 border-gray-300 cursor-pointer"
               style={{ fontFamily: 'inherit' }}
             />
           </div>
-        </div>
-        {currentTool === "brush" && (
-          <>
             <Button
               variant="ghost"
               size="sm"
@@ -557,10 +764,19 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
             >
               <RotateCw className="w-4 h-4" />
             </Button>
-          </>
-        )}
+                </div>
+              )}
+              {/* Eraser mode: show minimal controls */}
+              {currentTool === "eraser" && (
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-white">Eraser Active</span>
+                  <span className="text-xs text-white opacity-75">Click to clear all drawings</span>
+                </div>
+              )}
+            </div>
+            {/* Right section: Note Color and Save */}
+            <div className="flex items-center gap-3">
         <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300" />
-        {/* Note Color Controls (always visible) */}
         <div className="relative flex items-center gap-2 flex-shrink-0 min-w-0">
           <ColorPickerPopover
             value={editedNote.backgroundColor}
@@ -578,6 +794,9 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
         >
           <Check className="w-4 h-4 mr-1" />
         </Button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

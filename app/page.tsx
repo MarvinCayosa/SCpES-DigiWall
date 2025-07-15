@@ -5,8 +5,27 @@ import type { StickyNote, Tool } from "@/lib/types"
 import Canvas from "@/components/Canvas"
 import StickyNoteModal, { ViewStickyNoteModal } from "@/components/StickyNoteModal"
 import Toolbar from "@/components/Toolbar"
-import { Edit3 } from "lucide-react"
+import { Edit3, MoreVertical, Trash2, ExternalLink } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator 
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/firebase"
 import { ref, onValue, set, update, remove } from "firebase/database"
 import Link from "next/link"
@@ -19,7 +38,11 @@ export default function DigitalFreedomWall() {
   const [currentTool, setCurrentTool] = useState<Tool>("select")
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deletedNotesBackup, setDeletedNotesBackup] = useState<StickyNote[]>([])
+  const [undoTimeoutId, setUndoTimeoutId] = useState<NodeJS.Timeout | null>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const { toast } = useToast()
 
   // Canvas size for bounds
   const CANVAS_SIZE = 5000;
@@ -145,6 +168,90 @@ export default function DigitalFreedomWall() {
     setSelectedNote(null)
   }, [])
 
+  const handleMasterDelete = useCallback(() => {
+    if (stickyNotes.length === 0) {
+      toast({
+        title: "No notes to delete",
+        description: "There are no notes on the wall to delete.",
+      })
+      return
+    }
+
+    // Store backup for undo
+    setDeletedNotesBackup([...stickyNotes])
+    
+    // Clear all notes immediately
+    setStickyNotes([])
+    
+    // Clear all notes from Firebase
+    const notesRef = ref(db, "notes")
+    remove(notesRef)
+    
+    // Clear any existing timeout
+    if (undoTimeoutId) {
+      clearTimeout(undoTimeoutId)
+    }
+    
+    // Show toast with undo action
+    const toastId = toast({
+      title: "All notes deleted",
+      description: "Click undo to restore all notes.",
+      action: (
+        <Button 
+          size="sm" 
+          onClick={handleUndoDelete}
+          className="bg-blue-600 hover:bg-blue-700"
+        >
+          Undo
+        </Button>
+      ),
+    })
+    
+    // Set timeout for permanent deletion
+    const timeoutId = setTimeout(() => {
+      setDeletedNotesBackup([])
+      toastId.dismiss()
+    }, 3000)
+    
+    setUndoTimeoutId(timeoutId)
+    setIsDeleteDialogOpen(false)
+  }, [stickyNotes, toast, undoTimeoutId])
+
+  const handleUndoDelete = useCallback(() => {
+    if (deletedNotesBackup.length === 0) return
+    
+    // Clear the timeout
+    if (undoTimeoutId) {
+      clearTimeout(undoTimeoutId)
+      setUndoTimeoutId(null)
+    }
+    
+    // Restore notes locally
+    setStickyNotes(deletedNotesBackup)
+    
+    // Restore notes to Firebase
+    const notesRef = ref(db, "notes")
+    const notesToRestore: { [key: string]: any } = {}
+    
+    deletedNotesBackup.forEach(note => {
+      notesToRestore[note.id] = {
+        ...note,
+        createdAt: note.createdAt instanceof Date ? note.createdAt.getTime() : note.createdAt,
+        updatedAt: note.updatedAt instanceof Date ? note.updatedAt.getTime() : note.updatedAt,
+      }
+    })
+    
+    set(notesRef, notesToRestore)
+    
+    // Clear backup
+    setDeletedNotesBackup([])
+    
+    toast({
+      title: "Notes restored",
+      description: "All notes have been restored to the wall.",
+    })
+  }, [deletedNotesBackup, undoTimeoutId, toast])
+
   const updateNotePosition = useCallback((noteId: string, x: number, y: number) => {
     // Update position in Firebase
     const noteRef = ref(db, `notes/${noteId}`)
@@ -219,12 +326,61 @@ export default function DigitalFreedomWall() {
       <div className="fixed top-6 left-8 z-50 px-5 py-1.5 rounded-xl bg-white/70 backdrop-blur-md shadow-lg border border-white/40 font-extrabold text-xl text-[#18181b] tracking-tight animate-gradient-shimmer" style={{ fontFamily: 'SF Pro Display, Arial, Helvetica, sans-serif', letterSpacing: '-0.01em', boxShadow: '0 2px 8px 0 rgba(0, 123, 255, 0.10)' }}>
         SCpES <span className="bg-gradient-to-r from-blue-300 via-blue-400 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(0,123,255,0.18)] animate-gradient-shimmer" style={{ transition: 'color 0.2s' }}>{typed}&nbsp;</span>
       </div>
-      {/* Go to Submit Page Button */}
-      <Link href="/submit" passHref legacyBehavior>
-        <a className="fixed top-6 right-8 z-50 w-10 h-10 flex items-center justify-center rounded-full bg-white/70 hover:bg-blue-100 active:bg-blue-200 border border-gray-200 shadow-sm transition-colors" style={{ boxShadow: '0 1px 4px 0 rgba(0,0,0,0.06)' }} aria-label="Go to submit page">
-          <Edit3 className="w-5 h-5 text-blue-500" />
-        </a>
-      </Link>
+      
+      {/* Dropdown Menu */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button 
+            className="fixed top-6 right-8 z-50 w-10 h-10 rounded-full bg-white/70 hover:bg-blue-100 active:bg-blue-200 border border-gray-200 shadow-sm transition-colors" 
+            style={{ boxShadow: '0 1px 4px 0 rgba(0,0,0,0.06)' }}
+            size="icon"
+            aria-label="More options"
+          >
+            <MoreVertical className="w-5 h-5 text-blue-500" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuItem asChild>
+            <Link href="/submit" className="flex items-center gap-2">
+              <ExternalLink className="w-4 h-4" />
+              Go to Submit Page
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogTrigger asChild>
+              <DropdownMenuItem 
+                className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                onSelect={(e) => {
+                  e.preventDefault()
+                  setIsDeleteDialogOpen(true)
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete All Notes
+              </DropdownMenuItem>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete All Notes</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete all notes? This action will remove all {stickyNotes.length} notes from the wall. You will have 3 seconds to undo this action.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleMasterDelete}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Delete All
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
       {/* Main Canvas */}
       <Canvas
         ref={canvasRef}

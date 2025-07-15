@@ -26,7 +26,7 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
     const isDragging = useRef(false)
     const lastPanPoint = useRef({ x: 0, y: 0 })
     const startPan = useRef({ x: 0, y: 0 })
-    const animationFrameRef = useRef<number>()
+    const animationFrameRef = useRef<number | undefined>(undefined)
 
     // Pinch-to-zoom and inertia state
     const lastTouchDistance = useRef<number | null>(null);
@@ -40,11 +40,14 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
 
     // Listen for note drag events
     useEffect(() => {
-      window.addEventListener('note-drag-start', () => { isNoteDraggingGlobal = true; });
-      window.addEventListener('note-drag-end', () => { isNoteDraggingGlobal = false; });
+      const handleDragStart = () => { isNoteDraggingGlobal = true; };
+      const handleDragEnd = () => { isNoteDraggingGlobal = false; };
+      
+      window.addEventListener('note-drag-start', handleDragStart);
+      window.addEventListener('note-drag-end', handleDragEnd);
       return () => {
-        window.removeEventListener('note-drag-start', () => { isNoteDraggingGlobal = true; });
-        window.removeEventListener('note-drag-end', () => { isNoteDraggingGlobal = false; });
+        window.removeEventListener('note-drag-start', handleDragStart);
+        window.removeEventListener('note-drag-end', handleDragEnd);
       };
     }, []);
 
@@ -118,7 +121,11 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
 
     // Allow single-finger drag panning on mobile
     const handleTouchStart = useCallback((e: React.TouchEvent) => {
-      if (isNoteDraggingGlobal) return;
+      if (isNoteDraggingGlobal) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       if (e.touches.length === 1) {
         // Allow panning with one finger
         isDragging.current = true;
@@ -127,11 +134,13 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
         velocity.current = { x: 0, y: 0 };
 
         const handleGlobalTouchMove = (te: TouchEvent) => {
-          if (!isDragging.current) return;
+          if (!isDragging.current || isNoteDraggingGlobal) return;
+          te.preventDefault();
           if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
           }
           animationFrameRef.current = requestAnimationFrame(() => {
+            if (isNoteDraggingGlobal) return;
             const deltaX = te.touches[0].clientX - lastPanPoint.current.x;
             const deltaY = te.touches[0].clientY - lastPanPoint.current.y;
             velocity.current = { x: deltaX, y: deltaY };
@@ -168,6 +177,7 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
         const initialZoom = zoomRef.current;
         const handlePinchMove = (te: TouchEvent) => {
           if (te.touches.length !== 2) return;
+          te.preventDefault();
           const newDistance = Math.hypot(
             te.touches[0].clientX - te.touches[1].clientX,
             te.touches[0].clientY - te.touches[1].clientY
@@ -210,6 +220,7 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
           backgroundImage: `radial-gradient(circle, #e5e5e5 1px, transparent 1px)`,
           backgroundSize: `${20 * zoom}px ${20 * zoom}px`,
           backgroundPosition: `${pan.x}px ${pan.y}px`,
+          touchAction: 'none', // Prevent default touch behaviors on mobile
         }}
       >
         <div

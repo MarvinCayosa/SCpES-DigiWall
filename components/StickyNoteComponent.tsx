@@ -33,7 +33,7 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
   const [showControls, setShowControls] = useState(false)
   const noteRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animationFrameRef = useRef<number>()
+  const animationFrameRef = useRef<number | undefined>(undefined)
   const dragStartTime = useRef<number>(0)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isZoomingOut, setIsZoomingOut] = useState(false)
@@ -97,8 +97,8 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
   )
 
   // Touch support for dragging notes on mobile
-  const handleGlobalTouchMoveRef = useRef<(e: TouchEvent) => void>();
-  const handleGlobalTouchEndRef = useRef<(e: TouchEvent) => void>();
+  const handleGlobalTouchMoveRef = useRef<(e: TouchEvent) => void | undefined>(undefined);
+  const handleGlobalTouchEndRef = useRef<(e: TouchEvent) => void | undefined>(undefined);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     e.stopPropagation();
@@ -115,6 +115,8 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
 
     handleGlobalTouchMoveRef.current = (te: TouchEvent) => {
       if (te.touches.length !== 1) return;
+      te.preventDefault();
+      te.stopPropagation();
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
@@ -125,7 +127,9 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
         onMove(newX, newY);
       });
     };
-    handleGlobalTouchEndRef.current = () => {
+    handleGlobalTouchEndRef.current = (te: TouchEvent) => {
+      te.preventDefault();
+      te.stopPropagation();
       setIsDragging(false);
       window.dispatchEvent(new Event('note-drag-end'));
       if (animationFrameRef.current) {
@@ -236,6 +240,7 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
         borderRadius: "4px",
         willChange: isDragging ? "transform" : "auto",
         transition: isDragging ? "none" : "all 0.2s ease-out",
+        touchAction: 'none', // Prevent default touch behaviors on mobile
       }}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
