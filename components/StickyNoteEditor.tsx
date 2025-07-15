@@ -106,7 +106,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
           ctx.beginPath();
           ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
           ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, x, y);
-          ctx.strokeStyle = currentTool === "eraser" ? latestBackgroundColor : editedNote.textColor;
+          ctx.strokeStyle = currentTool === "eraser" ? backgroundColor : editedNote.textColor;
           ctx.lineWidth = brushSize * (currentTool === "eraser" ? 3 : 1);
           ctx.lineCap = "round";
           ctx.globalCompositeOperation = "source-over";
@@ -114,7 +114,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
         }
         lastPoint.current = { x, y };
       }
-    }, [isDrawing, currentTool, brushSize, editedNote.textColor, latestBackgroundColor]);
+    }, [isDrawing, currentTool, brushSize, editedNote.textColor, backgroundColor]);
   const startDrawing = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (currentTool !== "brush" && currentTool !== "eraser") return;
     setIsDrawing(true);
@@ -172,7 +172,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
         ctx.beginPath();
         ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
         ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, x, y);
-        ctx.strokeStyle = currentTool === "eraser" ? latestBackgroundColor : editedNote.textColor;
+        ctx.strokeStyle = currentTool === "eraser" ? backgroundColor : editedNote.textColor;
         ctx.lineWidth = brushSize * (currentTool === "eraser" ? 3 : 1);
         ctx.lineCap = "round";
         ctx.globalCompositeOperation = "source-over";
@@ -180,7 +180,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
       }
       lastPoint.current = { x, y };
     }
-  }, [isTouchDrawing, currentTool, brushSize, editedNote.textColor, latestBackgroundColor]);
+  }, [isTouchDrawing, currentTool, brushSize, editedNote.textColor, backgroundColor]);
   const startTouchDrawing = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
     if (currentTool !== "brush" && currentTool !== "eraser") return;
     setIsTouchDrawing(true);
