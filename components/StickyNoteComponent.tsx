@@ -44,6 +44,14 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
   // Track if a drag occurred to prevent click/double-click after drag
   const didDragRef = useRef(false);
 
+  // Detect if device supports hover
+  const [hasHover, setHasHover] = useState(true);
+  useEffect(() => {
+    if (window.matchMedia('(hover: none)').matches) {
+      setHasHover(false);
+    }
+  }, []);
+
   // Update handleMouseDown and mouse move/up logic
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -240,19 +248,29 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
           clearTimeout(clickTimer.current);
           clickTimer.current = null;
         }
-        if (e.detail === 2) {
-          // Double click: open modal
-          onEdit();
-        } else {
-          // Single click: bring to front (call onClick)
-          clickTimer.current = setTimeout(() => {
+        if (!hasHover) {
+          // Touch device logic: single tap shows controls, double tap opens view modal
+          if (e.detail === 2) {
+            // Double tap: open view modal (not edit)
             onClick();
-            clickTimer.current = null;
-          }, 200);
+          } else {
+            // Single tap: show controls
+            setShowControls(true);
+          }
+        } else {
+          // Desktop logic: double click opens edit modal, single click brings to front
+          if (e.detail === 2) {
+            onEdit();
+          } else {
+            clickTimer.current = setTimeout(() => {
+              onClick();
+              clickTimer.current = null;
+            }, 200);
+          }
         }
       }}
-      onMouseEnter={() => !isDragging && setShowControls(true)}
-      onMouseLeave={() => !isDragging && setShowControls(false)}
+      onMouseEnter={() => hasHover && !isDragging && setShowControls(true)}
+      onMouseLeave={() => hasHover && !isDragging && setShowControls(false)}
       onTouchEnd={() => setShowControls(false)}
       onTouchCancel={() => setShowControls(false)}
     >
