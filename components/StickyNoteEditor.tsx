@@ -10,7 +10,16 @@ import { useState as useReactState } from "react";
 const FONT_FAMILIES = ["Arial", "Helvetica", "Georgia", "Verdana", "Comic Sans MS"];
 const FONT_SIZES = [12, 14, 16, 18, 20, 24, 28, 32];
 const COMMON_COLORS = [
-  "#FFE066", "#FFB6C1", "#87CEEB", "#98FB98", "#FFD166", "#A685E2", "#FFFFFF", "#F0E68C", "#FFA07A", "#20B2AA"
+  "#FFD600", // Vivid yellow
+  "#FF6F00", // Vivid orange
+  "#FF1744", // Vivid red
+  "#D500F9", // Vivid purple
+  "#00E676", // Vivid green
+  "#00B8D4", // Vivid cyan
+  "#2979FF", // Vivid blue
+  "#F50057", // Hot pink
+  "#FFEA00", // Neon yellow
+  "#76FF03", // Neon green
 ];
 export type ToolType = "text" | "brush" | "eraser";
 
@@ -73,14 +82,57 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
       setDrawingHistory((prev: string[]) => {
         const newHistory = prev.slice(0, historyStep + 1);
         newHistory.push(data);
+        // Limit history to last 50 states
+        if (newHistory.length > 50) newHistory.shift();
         return newHistory;
       });
-      setHistoryStep(historyStep + 1);
+      setHistoryStep((prev) => Math.min(prev + 1, 49));
     }
   }, [historyStep, setDrawingHistory, setHistoryStep]);
 
+  // Track last drawing point for smoothing
+  const lastPoint = useRef<{ x: number; y: number } | null>(null);
+  const draw = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!isDrawing || (currentTool !== "brush" && currentTool !== "eraser")) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        if (lastPoint.current) {
+          ctx.beginPath();
+          ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
+          ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, x, y);
+          ctx.strokeStyle = currentTool === "eraser" ? latestBackgroundColor : editedNote.textColor;
+          ctx.lineWidth = brushSize * (currentTool === "eraser" ? 3 : 1);
+          ctx.lineCap = "round";
+          ctx.globalCompositeOperation = "source-over";
+          ctx.stroke();
+        }
+        lastPoint.current = { x, y };
+      }
+    }, [isDrawing, currentTool, brushSize, editedNote.textColor, latestBackgroundColor]);
+  const startDrawing = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (currentTool !== "brush" && currentTool !== "eraser") return;
+    setIsDrawing(true);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    lastPoint.current = { x, y };
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+  }, [currentTool]);
   const stopDrawing = useCallback(() => {
     setIsDrawing(false);
+    lastPoint.current = null;
     pushDrawingToHistory();
   }, [pushDrawingToHistory]);
 
@@ -105,49 +157,32 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
     setEditedNote((prev) => ({ ...prev, text: editorRef.current?.innerHTML || "" }));
   };
 
-  const startDrawing = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (currentTool !== "brush") return;
-      setIsDrawing(true);
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-      }
-    },
-    [currentTool]
-  );
-
-  const draw = useCallback(
-    (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!isDrawing || (currentTool !== "brush" && currentTool !== "eraser")) return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.lineTo(x, y);
-        ctx.strokeStyle = currentTool === "eraser" ? "#fff" : editedNote.textColor;
-        ctx.lineWidth = brushSize;
-        ctx.lineCap = "round";
-        ctx.globalCompositeOperation = currentTool === "eraser" ? "destination-out" : "source-over";
-        ctx.stroke();
-        ctx.globalCompositeOperation = "source-over";
-      }
-    },
-    [isDrawing, currentTool, brushSize, editedNote.textColor]
-  );
-
   // Touch drawing handlers
+  const touchDraw = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isTouchDrawing || (currentTool !== "brush" && currentTool !== "eraser")) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      if (lastPoint.current) {
+        ctx.beginPath();
+        ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
+        ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, x, y);
+        ctx.strokeStyle = currentTool === "eraser" ? latestBackgroundColor : editedNote.textColor;
+        ctx.lineWidth = brushSize * (currentTool === "eraser" ? 3 : 1);
+        ctx.lineCap = "round";
+        ctx.globalCompositeOperation = "source-over";
+        ctx.stroke();
+      }
+      lastPoint.current = { x, y };
+    }
+  }, [isTouchDrawing, currentTool, brushSize, editedNote.textColor, latestBackgroundColor]);
   const startTouchDrawing = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (currentTool !== "brush") return;
+    if (currentTool !== "brush" && currentTool !== "eraser") return;
     setIsTouchDrawing(true);
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -155,32 +190,16 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
     const touch = e.touches[0];
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
+    lastPoint.current = { x, y };
     const ctx = canvas.getContext("2d");
     if (ctx) {
       ctx.beginPath();
       ctx.moveTo(x, y);
     }
   }, [currentTool]);
-  const touchDraw = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isTouchDrawing || currentTool !== "brush") return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const touch = e.touches[0];
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-    const ctx = canvas.getContext("2d");
-    if (ctx) {
-      ctx.lineTo(x, y);
-      ctx.strokeStyle = editedNote.textColor;
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = "round";
-      ctx.globalCompositeOperation = "source-over";
-      ctx.stroke();
-    }
-  }, [isTouchDrawing, currentTool, brushSize, editedNote.textColor]);
   const stopTouchDrawing = useCallback(() => {
     setIsTouchDrawing(false);
+    lastPoint.current = null;
     pushDrawingToHistory();
   }, [pushDrawingToHistory]);
 
@@ -261,15 +280,15 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
           ref={canvasRef}
           width={mobile ? 352 : 544}
           height={mobile ? 352 : 400}
-          className={`absolute inset-0 ${currentTool === "brush" ? "cursor-crosshair z-20" : "pointer-events-none z-0"} transition-all duration-200`}
-          style={mobile ? { borderRadius: '16px', left: 0, top: 0, right: 0, bottom: 0, margin: 'auto', width: 'calc(100% - 48px)', height: 'calc(100% - 48px)' } : { borderRadius: '16px' }}
-          onMouseDown={startDrawing}
+          className={`absolute inset-0 ${currentTool === "brush" || currentTool === "eraser" ? "cursor-crosshair z-20" : "pointer-events-none z-0"} transition-all duration-200`}
+          style={mobile ? { borderRadius: '16px', left: 0, top: 0, right: 0, bottom: 0, margin: 'auto', width: 'calc(100% - 48px)', height: 'calc(100% - 48px)', touchAction: 'none' } : { borderRadius: '16px', touchAction: 'none' }}
+          onMouseDown={e => { e.preventDefault(); startDrawing(e); }}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
           onMouseLeave={stopDrawing}
-          onTouchStart={startTouchDrawing}
-          onTouchMove={touchDraw}
-          onTouchEnd={stopTouchDrawing}
+          onTouchStart={e => { e.preventDefault(); startTouchDrawing(e); }}
+          onTouchMove={e => { e.preventDefault(); touchDraw(e); }}
+          onTouchEnd={e => { e.preventDefault(); stopTouchDrawing(); }}
         />
         <div
           ref={editorRef}
@@ -339,6 +358,20 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
           <div className="bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-3 py-2 flex flex-nowrap items-center gap-2 z-30 transition-all duration-300 max-w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ fontFamily: 'inherit', minHeight: 40, overflowY: 'hidden', fontSize: '12px' }}>
             <Button variant={currentTool === "text" ? "secondary" : "ghost"} size="icon" onClick={() => setCurrentTool("text")} className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "text" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`} style={{ fontFamily: 'inherit', fontSize: '12px' }}><Type className="w-3 h-3" /></Button>
             <Button variant={currentTool === "brush" ? "secondary" : "ghost"} size="icon" onClick={() => setCurrentTool("brush")} className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "brush" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`} style={{ fontFamily: 'inherit', fontSize: '12px' }}><Brush className="w-3 h-3" /></Button>
+            <Button
+              variant={currentTool === "eraser" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setCurrentTool("eraser")}
+              className={`rounded-md w-7 h-7 p-0 transition-all duration-150 ${currentTool === "eraser" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
+              style={{ fontFamily: 'inherit', fontSize: '12px' }}
+              aria-label="Eraser"
+            >
+              {/* Classic eraser SVG icon */}
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                <rect x="3" y="13" width="10" height="4" rx="1" fill="#bbb"/>
+                <rect x="5" y="3" width="10" height="10" rx="2" fill="#fff" stroke="#bbb" strokeWidth="2"/>
+              </svg>
+            </Button>
             <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300 flex-shrink-0" />
             {/* Text controls: only show in text mode */}
             {currentTool === "text" && <>
@@ -447,6 +480,15 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
             size="sm"
             onClick={() => setCurrentTool("brush")}
             className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "brush" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
+            style={{ fontFamily: 'inherit' }}
+          >
+            <Brush className="w-4 h-4" />
+          </Button>
+          <Button
+            variant={currentTool === "eraser" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setCurrentTool("eraser")}
+            className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "eraser" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
             style={{ fontFamily: 'inherit' }}
           >
             <Brush className="w-4 h-4" />

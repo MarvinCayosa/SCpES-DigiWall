@@ -67,11 +67,15 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
   // Touch drawing state
   const [isTouchDrawing, setIsTouchDrawing] = useState(false);
 
+  // Track last drawing point for smoothing
+  const lastPoint = useRef<{ x: number; y: number } | null>(null);
+
   useEffect(() => {
     setEditedNote(note)
     if (editorRef.current) {
       editorRef.current.innerHTML = note.text || ""
     }
+    lastPoint.current = null;
   }, [note])
 
   // Load existing drawing when modal opens
@@ -102,22 +106,25 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
     }
   }, [isOpen, note.drawingData]);
 
-  // On drawing, push to history
+  // Undo/redo logic: always restore correct drawing state
   const pushDrawingToHistory = useCallback(() => {
     if (canvasRef.current) {
       const data = canvasRef.current.toDataURL();
       setDrawingHistory((prev) => {
         const newHistory = prev.slice(0, historyStep + 1);
         newHistory.push(data);
+        // Limit history to last 50 states
+        if (newHistory.length > 50) newHistory.shift();
         return newHistory;
       });
-      setHistoryStep((prev) => prev + 1);
+      setHistoryStep((prev) => Math.min(prev + 1, 49));
     }
   }, [historyStep]);
 
   // On mouse up after drawing, push to history
   const stopDrawing = useCallback(() => {
     setIsDrawing(false);
+    lastPoint.current = null;
     pushDrawingToHistory();
   }, [pushDrawingToHistory]);
 
@@ -183,20 +190,21 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
     setEditedNote((prev) => ({ ...prev, text: editorRef.current?.innerHTML || "" }))
   }
 
-  // Drawing functions
+  // Drawing and erasing logic
   const startDrawing = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (currentTool !== "brush") return
-      setIsDrawing(true)
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const rect = canvas.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      const ctx = canvas.getContext("2d")
+      if (currentTool !== "brush" && currentTool !== "eraser") return;
+      setIsDrawing(true);
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      lastPoint.current = { x, y };
+      const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.beginPath()
-        ctx.moveTo(x, y)
+        ctx.beginPath();
+        ctx.moveTo(x, y);
       }
     },
     [currentTool],
@@ -204,25 +212,27 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
 
   const draw = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
-      if (!isDrawing || (currentTool !== "brush" && currentTool !== "eraser")) return
-      const canvas = canvasRef.current
-      if (!canvas) return
-      const rect = canvas.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
-      const ctx = canvas.getContext("2d")
+      if (!isDrawing || (currentTool !== "brush" && currentTool !== "eraser")) return;
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const ctx = canvas.getContext("2d");
       if (ctx) {
-        ctx.lineTo(x, y)
-        ctx.strokeStyle = currentTool === "eraser" ? "#fff" : editedNote.textColor
-        ctx.lineWidth = brushSize
-        ctx.lineCap = "round"
-        ctx.globalCompositeOperation = currentTool === "eraser" ? "destination-out" : "source-over"
-        ctx.stroke()
-        ctx.globalCompositeOperation = "source-over"
+        if (lastPoint.current) {
+          ctx.beginPath();
+          ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
+          ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, x, y);
+          ctx.strokeStyle = currentTool === "eraser" ? editedNote.backgroundColor : editedNote.textColor;
+          ctx.lineWidth = brushSize * (currentTool === "eraser" ? 3 : 1);
+          ctx.lineCap = "round";
+          ctx.globalCompositeOperation = "source-over";
+          ctx.stroke();
+        }
+        lastPoint.current = { x, y };
       }
-    },
-    [isDrawing, currentTool, brushSize, editedNote.textColor],
-  )
+    }, [isDrawing, currentTool, brushSize, editedNote.textColor, editedNote.backgroundColor]);
 
   const clearCanvas = () => {
     const canvas = canvasRef.current
@@ -236,7 +246,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
 
   // Touch drawing handlers
   const startTouchDrawing = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (currentTool !== "brush") return;
+    if (currentTool !== "brush" && currentTool !== "eraser") return;
     setIsTouchDrawing(true);
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -244,6 +254,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
     const touch = e.touches[0];
     const x = touch.clientX - rect.left;
     const y = touch.clientY - rect.top;
+    lastPoint.current = { x, y };
     const ctx = canvas.getContext("2d");
     if (ctx) {
       ctx.beginPath();
@@ -251,7 +262,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
     }
   }, [currentTool]);
   const touchDraw = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isTouchDrawing || currentTool !== "brush") return;
+    if (!isTouchDrawing || (currentTool !== "brush" && currentTool !== "eraser")) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -260,16 +271,22 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
     const y = touch.clientY - rect.top;
     const ctx = canvas.getContext("2d");
     if (ctx) {
-      ctx.lineTo(x, y);
-      ctx.strokeStyle = editedNote.textColor;
-      ctx.lineWidth = brushSize;
-      ctx.lineCap = "round";
-      ctx.globalCompositeOperation = "source-over";
-      ctx.stroke();
+      if (lastPoint.current) {
+        ctx.beginPath();
+        ctx.moveTo(lastPoint.current.x, lastPoint.current.y);
+        ctx.quadraticCurveTo(lastPoint.current.x, lastPoint.current.y, x, y);
+        ctx.strokeStyle = currentTool === "eraser" ? editedNote.backgroundColor : editedNote.textColor;
+        ctx.lineWidth = brushSize * (currentTool === "eraser" ? 3 : 1);
+        ctx.lineCap = "round";
+        ctx.globalCompositeOperation = "source-over";
+        ctx.stroke();
+      }
+      lastPoint.current = { x, y };
     }
-  }, [isTouchDrawing, currentTool, brushSize, editedNote.textColor]);
+  }, [isTouchDrawing, currentTool, brushSize, editedNote.textColor, editedNote.backgroundColor]);
   const stopTouchDrawing = useCallback(() => {
     setIsTouchDrawing(false);
+    lastPoint.current = null;
     pushDrawingToHistory();
   }, [pushDrawingToHistory]);
 
@@ -292,9 +309,9 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center z-50 p-4">
       <div
-        className="relative w-[600px] h-[600px] shadow-2xl transition-all duration-300 ease-out backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl flex flex-col"
+        className="relative w-[600px] h-[600px] shadow-2xl transition-all duration-300 ease-out bg-white border border-white/40 rounded-2xl flex flex-col"
         style={{
-          backgroundColor: `${editedNote.backgroundColor}CC`, // add alpha for glass effect
+          backgroundColor: editedNote.backgroundColor,
           fontFamily: 'SF Pro Display, Arial, Helvetica, sans-serif',
           boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.18)',
         }}
@@ -317,15 +334,15 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
               ref={canvasRef}
               width={544}
               height={400}
-              className={`absolute inset-0 ${currentTool === "brush" ? "cursor-crosshair z-20" : "pointer-events-none z-0"} transition-all duration-200`}
-              onMouseDown={startDrawing}
+              className={`absolute inset-0 ${currentTool === "brush" || currentTool === "eraser" ? "cursor-crosshair z-20" : "pointer-events-none z-0"} transition-all duration-200`}
+              style={{ borderRadius: '16px', touchAction: 'none' }}
+              onMouseDown={e => { e.preventDefault(); startDrawing(e); }}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
-              onTouchStart={startTouchDrawing}
-              onTouchMove={touchDraw}
-              onTouchEnd={stopTouchDrawing}
-              style={{ borderRadius: '16px' }}
+              onTouchStart={e => { e.preventDefault(); startTouchDrawing(e); }}
+              onTouchMove={e => { e.preventDefault(); touchDraw(e); }}
+              onTouchEnd={e => { e.preventDefault(); stopTouchDrawing(); }}
             />
             {/* Text Area - Always present and interactive */}
             <div
@@ -369,20 +386,20 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
       {/* Control Panel - below modal */}
       <div className="mt-6 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-6 py-3 flex flex-nowrap items-center gap-3 z-30 transition-all duration-300 max-w-[95vw] overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ fontFamily: 'inherit', minHeight: 56, overflowY: 'hidden' }}>
         {/* All children: min-w-0, flex-shrink-0 to prevent wrapping */}
-        {/* Tool Toggle */}
-        <Button
-          variant={currentTool === "text" ? "secondary" : "ghost"}
-          size="sm"
-          onClick={() => setCurrentTool("text")}
+          {/* Tool Toggle */}
+          <Button
+            variant={currentTool === "text" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setCurrentTool("text")}
           className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "text" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
           style={{ fontFamily: 'inherit' }}
-        >
+          >
           <Type className="w-4 h-4" />
-        </Button>
-        <Button
-          variant={currentTool === "brush" ? "secondary" : "ghost"}
-          size="sm"
-          onClick={() => setCurrentTool("brush")}
+          </Button>
+          <Button
+            variant={currentTool === "brush" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setCurrentTool("brush")}
           className={`rounded-md w-8 h-8 p-0 transition-all duration-150 ${currentTool === "brush" ? "bg-white text-[#18181b]" : "text-white hover:bg-gray-700"} flex-shrink-0`}
           style={{ fontFamily: 'inherit' }}
         >
@@ -396,8 +413,12 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
           style={{ fontFamily: 'inherit' }}
           aria-label="Eraser"
         >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="3" y="13" width="10" height="4" rx="1" fill="#bbb"/><rect x="5" y="3" width="10" height="10" rx="2" fill="#fff" stroke="#bbb" strokeWidth="2"/></svg>
-        </Button>
+          {/* Classic eraser SVG icon */}
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="3" y="13" width="10" height="4" rx="1" fill="#bbb"/>
+            <rect x="5" y="3" width="10" height="10" rx="2" fill="#fff" stroke="#bbb" strokeWidth="2"/>
+          </svg>
+          </Button>
         <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300 flex-shrink-0" />
         {/* Text Controls (show only in text mode) */}
         <div className={`flex items-center gap-3 transition-all duration-300 ${currentTool === "text" ? 'opacity-100 max-w-[100vw]' : 'opacity-0 max-w-0 overflow-hidden pointer-events-none'}`} style={{ transition: 'all 0.3s cubic-bezier(.4,0,.2,1)' }}>
@@ -519,9 +540,9 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
           />
         </div>
         <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300" />
-        <Button
-          onClick={handleSave}
-          size="sm"
+          <Button
+            onClick={handleSave}
+            size="sm"
           className="rounded-md bg-green-300 hover:bg-green-400 text-[#18181b] px-4 h-8 text-base font-semibold shadow transition-all duration-150 border border-green-400"
           style={{ fontFamily: 'inherit', boxShadow: 'none' }}
           disabled={(() => { const html = editorRef.current?.innerHTML || ''; const textEmpty = !html || html === '<br>' || html.replace(/<[^>]+>/g, '').trim() === ''; let drawing = false; if (canvasRef.current) { const ctx = canvasRef.current.getContext('2d'); if (ctx) { const pixelData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height); drawing = pixelData.data.some((channel, index) => index % 4 === 3 && channel > 0); } } return textEmpty && !drawing; })()}
@@ -548,9 +569,9 @@ export function ViewStickyNoteModal({ note, isOpen, onClose }: ViewStickyNoteMod
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
       <div
-        className="relative w-[500px] h-[500px] transition-all duration-300 ease-out backdrop-blur-xl bg-white/60 border border-white/40 rounded-2xl flex flex-col animate-zoomIn"
+        className="relative w-[500px] h-[500px] transition-all duration-300 ease-out bg-white border border-white/40 rounded-2xl flex flex-col animate-zoomIn"
         style={{
-          backgroundColor: `${note.backgroundColor}CC`,
+          backgroundColor: note.backgroundColor,
           fontFamily: 'SF Pro Display, Arial, Helvetica, sans-serif',
           // Removed boxShadow for no drop shadow
         }}
@@ -564,7 +585,7 @@ export function ViewStickyNoteModal({ note, isOpen, onClose }: ViewStickyNoteMod
           style={{ fontFamily: 'inherit' }}
         >
           <X className="w-5 h-5" />
-        </Button>
+          </Button>
         {/* Main Content */}
         <div className="p-8 h-full flex flex-col relative overflow-hidden">
           <div className="flex-1 overflow-y-auto overflow-x-hidden relative">

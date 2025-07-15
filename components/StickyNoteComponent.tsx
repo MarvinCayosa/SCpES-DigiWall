@@ -253,6 +253,8 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
       }}
       onMouseEnter={() => !isDragging && setShowControls(true)}
       onMouseLeave={() => !isDragging && setShowControls(false)}
+      onTouchEnd={() => setShowControls(false)}
+      onTouchCancel={() => setShowControls(false)}
     >
       {/* Control Buttons */}
       <div
