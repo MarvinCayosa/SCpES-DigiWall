@@ -147,85 +147,85 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
 
   return (
     <>
-      <div
-        ref={noteRef}
-        className={`absolute select-none shadow-lg hover:shadow-xl transition-all duration-200 group ${
-          isDragging ? "cursor-grabbing z-50 scale-105" : "cursor-grab hover:scale-102"
+    <div
+      ref={noteRef}
+      className={`absolute select-none shadow-lg hover:shadow-xl transition-all duration-200 group ${
+        isDragging ? "cursor-grabbing z-50 scale-105" : "cursor-grab hover:scale-102"
         } ${isZoomingOut ? "animate-zoomOut" : ""}`}
-        style={{
+      style={{
           left: note.x,
           top: note.y,
           width: note.width * 1.25, // 25% bigger
           height: note.height * 1.25, // 25% bigger
-          backgroundColor: note.backgroundColor,
-          transform: `rotate(-1deg) ${isDragging ? "scale(1.05)" : ""}`,
-          borderRadius: "4px",
-          willChange: isDragging ? "transform" : "auto",
-          transition: isDragging ? "none" : "all 0.2s ease-out",
-        }}
-        onMouseDown={handleMouseDown}
+        backgroundColor: note.backgroundColor,
+        transform: `rotate(-1deg) ${isDragging ? "scale(1.05)" : ""}`,
+        borderRadius: "4px",
+        willChange: isDragging ? "transform" : "auto",
+        transition: isDragging ? "none" : "all 0.2s ease-out",
+      }}
+      onMouseDown={handleMouseDown}
         onDoubleClick={(e) => {
           // Only trigger onClick if not clicking a control button
           if ((e.target as HTMLElement).closest('.note-control-btn')) return;
           if (!isDragging) onClick();
         }}
-        onMouseEnter={() => !isDragging && setShowControls(true)}
-        onMouseLeave={() => !isDragging && setShowControls(false)}
-      >
-        {/* Control Buttons */}
-        <div
+      onMouseEnter={() => !isDragging && setShowControls(true)}
+      onMouseLeave={() => !isDragging && setShowControls(false)}
+    >
+      {/* Control Buttons */}
+      <div
           className={`absolute -top-3 -right-3 flex gap-2 transition-all duration-300 backdrop-blur-md bg-white/30 border border-white/40 shadow-xl rounded-2xl p-1.5 ${
-            showControls && !isDragging ? "opacity-100 scale-100" : "opacity-0 scale-90"
-          }`}
+          showControls && !isDragging ? "opacity-100 scale-100" : "opacity-0 scale-90"
+        }`}
           style={{ boxShadow: "0 4px 24px 0 rgba(0,0,0,0.10)", WebkitBackdropFilter: "blur(8px)", backdropFilter: "blur(8px)" }}
-        >
+      >
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="secondary"
+        <Button
+          size="icon"
+          variant="secondary"
                 className="note-control-btn w-8 h-8 rounded-full bg-blue-500/80 hover:bg-blue-600/90 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:ring-2 focus:ring-blue-400 focus:ring-offset-2"
-                onClick={handleEdit}
+          onClick={handleEdit}
                 tabIndex={0}
                 aria-label="Edit note"
-              >
+        >
                 <Edit3 className="w-4 h-4" />
-              </Button>
+        </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">Edit</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="secondary"
+        <Button
+          size="icon"
+          variant="secondary"
                 className="note-control-btn w-8 h-8 rounded-full bg-red-500/80 hover:bg-red-600/90 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:ring-2 focus:ring-red-400 focus:ring-offset-2"
-                onClick={handleDelete}
+          onClick={handleDelete}
                 tabIndex={0}
                 aria-label="Delete note"
-              >
+        >
                 <Trash2 className="w-4 h-4" />
-              </Button>
+        </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">Delete</TooltipContent>
           </Tooltip>
-        </div>
+      </div>
 
         {/* In the sticky note preview, scale the content for WYSIWYG with aspect ratio */}
         <div
           className="p-6 h-full flex flex-col justify-between relative pointer-events-none"
           style={{ overflow: 'hidden' }}
         >
-          {/* Drawing Canvas - positioned behind text */}
-          {note.drawingData?.imageData && (
-            <canvas
-              ref={canvasRef}
-              width={note.width - 32}
-              height={note.height - 32}
-              className="absolute inset-4 pointer-events-none z-0"
-              style={{ opacity: 0.8 }}
-            />
-          )}
+        {/* Drawing Canvas - positioned behind text */}
+        {note.drawingData?.imageData && (
+          <canvas
+            ref={canvasRef}
+            width={note.width - 32}
+            height={note.height - 32}
+            className="absolute inset-4 pointer-events-none z-0"
+            style={{ opacity: 0.8 }}
+          />
+        )}
           {/* Scaled WYSIWYG Content */}
           <div
             style={{
@@ -237,19 +237,19 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
               position: 'relative',
             }}
           >
-            <div
+        <div
               className="flex-1 overflow-hidden relative z-10 text-lg font-medium"
-              style={{
-                color: note.textColor,
+          style={{
+            color: note.textColor,
                 fontSize: note.fontSize,
-                fontFamily: note.fontFamily,
-                fontWeight: note.fontWeight,
-                fontStyle: note.fontStyle,
-                textDecoration: note.textDecoration,
+            fontFamily: note.fontFamily,
+            fontWeight: note.fontWeight,
+            fontStyle: note.fontStyle,
+            textDecoration: note.textDecoration,
                 boxShadow: 'none',
                 transition: 'font-size 0.2s cubic-bezier(.4,0,.2,1)',
-              }}
-            >
+          }}
+        >
               {note.text && <div className="whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: note.text }} />}
             </div>
           </div>

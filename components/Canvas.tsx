@@ -67,39 +67,39 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
     const handleMouseDown = useCallback(
       (e: React.MouseEvent) => {
         if (isNoteDraggingGlobal) return;
-        isDragging.current = true
-        lastPanPoint.current = { x: e.clientX, y: e.clientY }
+          isDragging.current = true
+          lastPanPoint.current = { x: e.clientX, y: e.clientY }
         startPan.current = { ...pan };
 
-        const handleGlobalMouseMove = (e: MouseEvent) => {
-          if (!isDragging.current) return
+          const handleGlobalMouseMove = (e: MouseEvent) => {
+            if (!isDragging.current) return
 
-          if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current)
-          }
+            if (animationFrameRef.current) {
+              cancelAnimationFrame(animationFrameRef.current)
+            }
 
-          animationFrameRef.current = requestAnimationFrame(() => {
-            const deltaX = e.clientX - lastPanPoint.current.x
-            const deltaY = e.clientY - lastPanPoint.current.y
+            animationFrameRef.current = requestAnimationFrame(() => {
+              const deltaX = e.clientX - lastPanPoint.current.x
+              const deltaY = e.clientY - lastPanPoint.current.y
             // Use startPan for smooth panning
-            onPanChange({
+              onPanChange({
               x: startPan.current.x + (e.clientX - lastPanPoint.current.x),
               y: startPan.current.y + (e.clientY - lastPanPoint.current.y),
             })
-          })
-        }
-
-        const handleGlobalMouseUp = () => {
-          isDragging.current = false
-          if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current)
+            })
           }
-          document.removeEventListener("mousemove", handleGlobalMouseMove)
-          document.removeEventListener("mouseup", handleGlobalMouseUp)
-        }
 
-        document.addEventListener("mousemove", handleGlobalMouseMove)
-        document.addEventListener("mouseup", handleGlobalMouseUp)
+          const handleGlobalMouseUp = () => {
+            isDragging.current = false
+            if (animationFrameRef.current) {
+              cancelAnimationFrame(animationFrameRef.current)
+            }
+            document.removeEventListener("mousemove", handleGlobalMouseMove)
+            document.removeEventListener("mouseup", handleGlobalMouseUp)
+          }
+
+          document.addEventListener("mousemove", handleGlobalMouseMove)
+          document.addEventListener("mouseup", handleGlobalMouseUp)
       },
       [pan, onPanChange],
     )

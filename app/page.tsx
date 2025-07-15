@@ -5,10 +5,11 @@ import type { StickyNote, Tool } from "@/lib/types"
 import Canvas from "@/components/Canvas"
 import StickyNoteModal, { ViewStickyNoteModal } from "@/components/StickyNoteModal"
 import Toolbar from "@/components/Toolbar"
-import { Plus } from "lucide-react"
+import { Edit3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { db } from "@/lib/firebase"
 import { ref, onValue, set, update, remove } from "firebase/database"
+import Link from "next/link"
 
 export default function DigitalFreedomWall() {
   const [stickyNotes, setStickyNotes] = useState<StickyNote[]>([])
@@ -216,6 +217,12 @@ export default function DigitalFreedomWall() {
       <div className="fixed top-6 left-8 z-50 px-5 py-1.5 rounded-xl bg-white/70 backdrop-blur-md shadow-lg border border-white/40 font-extrabold text-xl text-[#18181b] tracking-tight animate-gradient-shimmer" style={{ fontFamily: 'SF Pro Display, Arial, Helvetica, sans-serif', letterSpacing: '-0.01em', boxShadow: '0 2px 8px 0 rgba(0, 123, 255, 0.10)' }}>
         SCpES <span className="bg-gradient-to-r from-blue-300 via-blue-400 to-cyan-300 bg-clip-text text-transparent drop-shadow-[0_0_4px_rgba(0,123,255,0.18)] animate-gradient-shimmer" style={{ transition: 'color 0.2s' }}>{typed}&nbsp;</span>
       </div>
+      {/* Go to Submit Page Button */}
+      <Link href="/submit" passHref legacyBehavior>
+        <a className="fixed top-6 right-8 z-50 w-10 h-10 flex items-center justify-center rounded-full bg-white/70 hover:bg-blue-100 active:bg-blue-200 border border-gray-200 shadow-sm transition-colors" style={{ boxShadow: '0 1px 4px 0 rgba(0,0,0,0.06)' }} aria-label="Go to submit page">
+          <Edit3 className="w-5 h-5 text-blue-500" />
+        </a>
+      </Link>
       {/* Main Canvas */}
       <Canvas
         ref={canvasRef}
@@ -236,7 +243,7 @@ export default function DigitalFreedomWall() {
         className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-purple-600 hover:bg-purple-700 shadow-lg z-50"
         size="icon"
       >
-        <Plus className="w-6 h-6" />
+        <Edit3 className="w-6 h-6" />
       </Button>
 
       {/* Toolbar */}

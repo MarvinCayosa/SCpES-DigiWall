@@ -170,7 +170,7 @@ body {
   background: #7dd3fc;
   height: 6px;
   border-radius: 9999px;
-}
+  }
 .brush-slider input[type="range"]::-ms-fill-lower,
 .brush-slider input[type="range"]::-ms-fill-upper {
   background: #7dd3fc;
