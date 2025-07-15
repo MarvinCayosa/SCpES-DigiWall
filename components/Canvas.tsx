@@ -28,6 +28,11 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
     const startPan = useRef({ x: 0, y: 0 })
     const animationFrameRef = useRef<number>()
 
+    // Pinch-to-zoom and inertia state
+    const lastTouchDistance = useRef<number | null>(null);
+    const velocity = useRef({ x: 0, y: 0 });
+    const inertiaFrame = useRef<number | null>(null);
+
     // Listen for note drag events
     useEffect(() => {
       window.addEventListener('note-drag-start', () => { isNoteDraggingGlobal = true; });
@@ -114,6 +119,7 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
         isDragging.current = true;
         lastPanPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         startPan.current = { ...pan };
+        velocity.current = { x: 0, y: 0 };
 
         const handleGlobalTouchMove = (te: TouchEvent) => {
           if (!isDragging.current) return;
@@ -123,6 +129,7 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
           animationFrameRef.current = requestAnimationFrame(() => {
             const deltaX = te.touches[0].clientX - lastPanPoint.current.x;
             const deltaY = te.touches[0].clientY - lastPanPoint.current.y;
+            velocity.current = { x: deltaX, y: deltaY };
             onPanChange({
               x: startPan.current.x + (te.touches[0].clientX - lastPanPoint.current.x),
               y: startPan.current.y + (te.touches[0].clientY - lastPanPoint.current.y),
@@ -135,14 +142,52 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
           if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
           }
+          // Inertia
+          let vx = velocity.current.x;
+          let vy = velocity.current.y;
+          const friction = 0.95;
+          const animate = () => {
+            if (Math.abs(vx) > 0.5 || Math.abs(vy) > 0.5) {
+              onPanChange((prev) => ({ x: prev.x + vx, y: prev.y + vy }));
+              vx *= friction;
+              vy *= friction;
+              inertiaFrame.current = requestAnimationFrame(animate);
+            } else {
+              inertiaFrame.current = null;
+            }
+          };
+          animate();
           document.removeEventListener('touchmove', handleGlobalTouchMove);
           document.removeEventListener('touchend', handleGlobalTouchEnd);
         };
 
         document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
         document.addEventListener('touchend', handleGlobalTouchEnd, { passive: false });
+      } else if (e.touches.length === 2) {
+        // Pinch-to-zoom
+        lastTouchDistance.current = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const initialZoom = zoom;
+        const handlePinchMove = (te: TouchEvent) => {
+          if (te.touches.length !== 2) return;
+          const newDistance = Math.hypot(
+            te.touches[0].clientX - te.touches[1].clientX,
+            te.touches[0].clientY - te.touches[1].clientY
+          );
+          const scale = newDistance / (lastTouchDistance.current || newDistance);
+          onZoomChange(Math.max(0.1, Math.min(3, initialZoom * scale)));
+        };
+        const handlePinchEnd = () => {
+          lastTouchDistance.current = null;
+          document.removeEventListener('touchmove', handlePinchMove);
+          document.removeEventListener('touchend', handlePinchEnd);
+        };
+        document.addEventListener('touchmove', handlePinchMove, { passive: false });
+        document.addEventListener('touchend', handlePinchEnd, { passive: false });
       }
-    }, [pan, onPanChange]);
+    }, [pan, onPanChange, zoom, onZoomChange]);
 
     // Cleanup animation frame on unmount
     useEffect(() => {

@@ -64,6 +64,9 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
   const [drawingHistory, setDrawingHistory] = useState<string[]>([]);
   const [historyStep, setHistoryStep] = useState<number>(-1);
 
+  // Touch drawing state
+  const [isTouchDrawing, setIsTouchDrawing] = useState(false);
+
   useEffect(() => {
     setEditedNote(note)
     if (editorRef.current) {
@@ -231,6 +234,45 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
     }
   }
 
+  // Touch drawing handlers
+  const startTouchDrawing = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (currentTool !== "brush") return;
+    setIsTouchDrawing(true);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+  }, [currentTool]);
+  const touchDraw = useCallback((e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isTouchDrawing || currentTool !== "brush") return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches[0];
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      ctx.lineTo(x, y);
+      ctx.strokeStyle = editedNote.textColor;
+      ctx.lineWidth = brushSize;
+      ctx.lineCap = "round";
+      ctx.globalCompositeOperation = "source-over";
+      ctx.stroke();
+    }
+  }, [isTouchDrawing, currentTool, brushSize, editedNote.textColor]);
+  const stopTouchDrawing = useCallback(() => {
+    setIsTouchDrawing(false);
+    pushDrawingToHistory();
+  }, [pushDrawingToHistory]);
+
   // Utility: check if drawing exists
   function hasDrawing() {
     if (!canvasRef.current) return false;
@@ -280,6 +322,9 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
               onMouseMove={draw}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
+              onTouchStart={startTouchDrawing}
+              onTouchMove={touchDraw}
+              onTouchEnd={stopTouchDrawing}
               style={{ borderRadius: '16px' }}
             />
             {/* Text Area - Always present and interactive */}
