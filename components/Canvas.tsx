@@ -32,6 +32,11 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
     const lastTouchDistance = useRef<number | null>(null);
     const velocity = useRef({ x: 0, y: 0 });
     const inertiaFrame = useRef<number | null>(null);
+    // --- NEW: Always use latest zoom and pan for touch gestures ---
+    const zoomRef = useRef(zoom);
+    const panRef = useRef(pan);
+    useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+    useEffect(() => { panRef.current = pan; }, [pan]);
 
     // Listen for note drag events
     useEffect(() => {
@@ -118,7 +123,7 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
         // Allow panning with one finger
         isDragging.current = true;
         lastPanPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        startPan.current = { ...pan };
+        startPan.current = { ...panRef.current };
         velocity.current = { x: 0, y: 0 };
 
         const handleGlobalTouchMove = (te: TouchEvent) => {
@@ -148,7 +153,7 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
           const friction = 0.95;
           const animate = () => {
             if (Math.abs(vx) > 0.5 || Math.abs(vy) > 0.5) {
-              onPanChange((prev) => ({ x: prev.x + vx, y: prev.y + vy }));
+              onPanChange({ x: panRef.current.x + vx, y: panRef.current.y + vy });
               vx *= friction;
               vy *= friction;
               inertiaFrame.current = requestAnimationFrame(animate);
@@ -159,6 +164,11 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
           animate();
           document.removeEventListener('touchmove', handleGlobalTouchMove);
           document.removeEventListener('touchend', handleGlobalTouchEnd);
+          // --- Reset all refs ---
+          isDragging.current = false;
+          lastPanPoint.current = { x: 0, y: 0 };
+          startPan.current = { x: 0, y: 0 };
+          velocity.current = { x: 0, y: 0 };
         };
 
         document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
@@ -169,7 +179,8 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         );
-        const initialZoom = zoom;
+        // --- Use latest zoom for pinch ---
+        const initialZoom = zoomRef.current;
         const handlePinchMove = (te: TouchEvent) => {
           if (te.touches.length !== 2) return;
           const newDistance = Math.hypot(
@@ -183,11 +194,16 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
           lastTouchDistance.current = null;
           document.removeEventListener('touchmove', handlePinchMove);
           document.removeEventListener('touchend', handlePinchEnd);
+          // --- Reset all refs ---
+          isDragging.current = false;
+          lastPanPoint.current = { x: 0, y: 0 };
+          startPan.current = { x: 0, y: 0 };
+          velocity.current = { x: 0, y: 0 };
         };
         document.addEventListener('touchmove', handlePinchMove, { passive: false });
         document.addEventListener('touchend', handlePinchEnd, { passive: false });
       }
-    }, [pan, onPanChange, zoom, onZoomChange]);
+    }, [onPanChange, onZoomChange]);
 
     // Cleanup animation frame on unmount
     useEffect(() => {

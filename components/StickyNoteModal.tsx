@@ -326,66 +326,64 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
         >
           <X className="w-5 h-5" />
         </Button>
-        {/* Main Content */}
-        <div className="p-8 h-full flex flex-col relative overflow-hidden">
-          <div className="flex-1 overflow-none relative">
-            {/* Drawing Canvas - Always present and interactive when brush tool is selected */}
-            <canvas
-              ref={canvasRef}
-              width={544}
-              height={400}
-              className={`absolute inset-0 ${currentTool === "brush" || currentTool === "eraser" ? "cursor-crosshair z-20" : "pointer-events-none z-0"} transition-all duration-200`}
-              style={{ borderRadius: '16px', touchAction: 'none' }}
-              onMouseDown={e => { e.preventDefault(); startDrawing(e); }}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-              onTouchStart={e => { e.preventDefault(); startTouchDrawing(e); }}
-              onTouchMove={e => { e.preventDefault(); touchDraw(e); }}
-              onTouchEnd={e => { e.preventDefault(); stopTouchDrawing(); }}
-            />
-            {/* Text Area - Always present and interactive */}
-            <div
-              ref={editorRef}
-              contentEditable={currentTool === "text"}
-              suppressContentEditableWarning
-              className="absolute inset-0 border-none bg-transparent focus:ring-0 focus:outline-none focus:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 z-10 text-lg font-medium overflow-y-auto"
-              style={{
-                color: editedNote.textColor,
-                fontSize: editedNote.fontSize,
-                fontFamily: editedNote.fontFamily,
-                minHeight: 40,
-                fontWeight: editedNote.fontWeight,
-                fontStyle: editedNote.fontStyle,
-                textDecoration: editedNote.textDecoration,
-                boxShadow: 'none',
-                pointerEvents: currentTool === "text" ? "auto" : "none",
-                transition: 'font-size 0.2s cubic-bezier(.4,0,.2,1)',
-                outline: 'none',
-                borderRadius: 8,
-                overflowX: 'hidden',
-                scrollbarWidth: 'thin',
-              }}
-              onInput={() => {
-                updateNote({ text: editorRef.current?.innerHTML || "" });
-                if (editorRef.current) {
-                  editorRef.current.style.fontFamily = editedNote.fontFamily;
-                  editorRef.current.style.fontSize = editedNote.fontSize + 'px';
-                }
-              }}
-            />
-            {/* Custom placeholder for contenteditable */}
-            {(!editedNote.text || editedNote.text === '<br>') && (
-              <div className="absolute inset-0 z-0 pointer-events-none text-gray-400 select-none p-2 text-lg" style={{fontFamily: 'inherit'}}>
-                Write your message...
-              </div>
-            )}
-          </div>
+        {/* Main Content - now fills the modal with no inner padding */}
+        <div className="flex-1 relative overflow-hidden">
+          {/* Drawing Canvas - fills modal */}
+          <canvas
+            ref={canvasRef}
+            width={544}
+            height={544}
+            className={`absolute inset-0 ${currentTool === "brush" || currentTool === "eraser" ? "cursor-crosshair z-20" : "pointer-events-none z-0"} transition-all duration-200`}
+            style={{ borderRadius: '16px', touchAction: 'none', width: '100%', height: '100%' }}
+            onMouseDown={e => { e.preventDefault(); startDrawing(e); }}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={e => { e.preventDefault(); startTouchDrawing(e); }}
+            onTouchMove={e => { e.preventDefault(); touchDraw(e); }}
+            onTouchEnd={e => { e.preventDefault(); stopTouchDrawing(); }}
+          />
+          {/* Text Area - fills modal */}
+          <div
+            ref={editorRef}
+            contentEditable={currentTool === "text"}
+            suppressContentEditableWarning
+            className="absolute inset-0 border-none bg-transparent focus:ring-0 focus:outline-none focus:border-transparent focus-visible:ring-0 focus-visible:ring-offset-0 z-10 text-lg font-medium overflow-y-auto"
+            style={{
+              color: editedNote.textColor,
+              fontSize: editedNote.fontSize,
+              fontFamily: editedNote.fontFamily,
+              minHeight: 40,
+              fontWeight: editedNote.fontWeight,
+              fontStyle: editedNote.fontStyle,
+              textDecoration: editedNote.textDecoration,
+              boxShadow: 'none',
+              pointerEvents: currentTool === "text" ? "auto" : "none",
+              transition: 'font-size 0.2s cubic-bezier(.4,0,.2,1)',
+              outline: 'none',
+              borderRadius: 16,
+              overflowX: 'hidden',
+              scrollbarWidth: 'thin',
+              padding: 0,
+            }}
+            onInput={() => {
+              updateNote({ text: editorRef.current?.innerHTML || "" });
+              if (editorRef.current) {
+                editorRef.current.style.fontFamily = editedNote.fontFamily;
+                editorRef.current.style.fontSize = editedNote.fontSize + 'px';
+              }
+            }}
+          />
+          {/* Custom placeholder for contenteditable */}
+          {(!editedNote.text || editedNote.text === '<br>') && (
+            <div className="absolute inset-0 z-0 pointer-events-none text-gray-400 select-none p-2 text-lg flex items-center justify-center" style={{fontFamily: 'inherit'}}>
+              Write your message...
+            </div>
+          )}
         </div>
-      </div>
-      {/* Control Panel - below modal */}
-      <div className="mt-6 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-6 py-3 flex flex-nowrap items-center gap-3 z-30 transition-all duration-300 max-w-[95vw] overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ fontFamily: 'inherit', minHeight: 56, overflowY: 'hidden' }}>
-        {/* All children: min-w-0, flex-shrink-0 to prevent wrapping */}
+        {/* Control Panel - below modal */}
+        <div className="mt-6 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-6 py-3 flex flex-nowrap items-center gap-3 z-30 transition-all duration-300 max-w-[95vw] overflow-x-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ fontFamily: 'inherit', minHeight: 56, overflowY: 'hidden' }}>
+          {/* All children: min-w-0, flex-shrink-0 to prevent wrapping */}
           {/* Tool Toggle */}
           <Button
             variant={currentTool === "text" ? "secondary" : "ghost"}
