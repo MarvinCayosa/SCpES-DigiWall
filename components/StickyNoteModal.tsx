@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { X, Check, Type, Brush, Bold, Italic, Underline, Palette, Minus, Plus, RotateCcw, RotateCw } from "lucide-react"
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 interface StickyNoteModalProps {
   note: StickyNote
@@ -69,6 +70,8 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
 
   // Track last drawing point for smoothing
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
+
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     setEditedNote(note)
@@ -151,6 +154,19 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
       img.src = drawingHistory[historyStep];
     }
   }, [historyStep, drawingHistory]);
+
+  // When the eraser tool is selected, clear the canvas
+  useEffect(() => {
+    if (currentTool === "eraser" && canvasRef.current) {
+      const ctx = canvasRef.current.getContext("2d");
+      if (ctx) {
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+      // Also clear drawing history
+      setDrawingHistory([]);
+      setHistoryStep(-1);
+    }
+  }, [currentTool]);
 
   const handleSave = useCallback(() => {
     // Save HTML content from contenteditable
@@ -490,7 +506,20 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
         {/* Brush Controls (show only in brush mode) */}
         <div className={`flex items-center gap-3 transition-all duration-300 ${currentTool === "brush" ? 'opacity-100 max-w-[100vw]' : 'opacity-0 max-w-0 overflow-hidden pointer-events-none'}`} style={{ transition: 'all 0.3s cubic-bezier(.4,0,.2,1)' }}>
           <span className="text-xs text-white">Brush</span>
-          <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} className="w-32 brush-slider" />
+          {isMobile ? (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button size="sm" variant="ghost" className="rounded-md w-8 h-8 p-0 text-white border border-gray-700 flex items-center justify-center" aria-label="Brush size">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#fff" strokeWidth="2" fill="#222" /><circle cx="10" cy="10" r="{brushSize}" fill="#fff" /></svg>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent side="top" align="center" className="p-4 flex flex-col items-center z-[300]">
+                <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} orientation="vertical" className="h-32" />
+              </PopoverContent>
+            </Popover>
+          ) : (
+            <Slider min={1} max={20} step={1} value={[brushSize]} onValueChange={([v]) => setBrushSize(v)} className="w-32 brush-slider" />
+          )}
           <div className="flex items-center gap-2">
             <span className="text-xs text-white">Color</span>
             <input
