@@ -314,7 +314,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
         style={{
           backgroundColor: editedNote.backgroundColor,
           fontFamily: 'SF Pro Display, Arial, Helvetica, sans-serif',
-          boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.18)',
+          boxShadow: '0 8px 32px 0 rgba(31, 34, 84, 0.18)',
         }}
       >
         {/* Close Button */}
