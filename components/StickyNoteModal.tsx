@@ -549,6 +549,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
         </Button>
       </div>
     </div>
+    </div>
   )
 }
 
