@@ -38,6 +38,13 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isZoomingOut, setIsZoomingOut] = useState(false)
 
+  // Timer ref for distinguishing single vs double click
+  const clickTimer = useRef<NodeJS.Timeout | null>(null);
+
+  // Track if a drag occurred to prevent click/double-click after drag
+  const didDragRef = useRef(false);
+
+  // Update handleMouseDown and mouse move/up logic
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation()
@@ -50,13 +57,14 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
         x: e.clientX - note.x,
         y: e.clientY - note.y,
       })
+      didDragRef.current = false;
 
       // Add global mouse event listeners for smoother dragging
       const handleGlobalMouseMove = (e: MouseEvent) => {
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current)
         }
-
+        didDragRef.current = true;
         animationFrameRef.current = requestAnimationFrame(() => {
           const newX = e.clientX - dragStart.x
           const newY = e.clientY - dragStart.y
@@ -67,14 +75,9 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
       const handleGlobalMouseUp = () => {
         setIsDragging(false)
         window.dispatchEvent(new Event('note-drag-end'));
-
         if (animationFrameRef.current) {
           cancelAnimationFrame(animationFrameRef.current)
         }
-
-        // Only trigger onMove if we actually dragged (not just a click)
-        // No need to call onMove again, already called in real time
-
         document.removeEventListener("mousemove", handleGlobalMouseMove)
         document.removeEventListener("mouseup", handleGlobalMouseUp)
       }
@@ -228,11 +231,26 @@ export default function StickyNoteComponent({ note, onClick, onEdit, onMove, onD
       }}
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
-        onDoubleClick={(e) => {
-          // Only trigger onClick if not clicking a control button
-          if ((e.target as HTMLElement).closest('.note-control-btn')) return;
-          if (!isDragging) onClick();
-        }}
+      onClick={(e) => {
+        // Only trigger onClick if not clicking a control button or dragging
+        if ((e.target as HTMLElement).closest('.note-control-btn')) return;
+        if (isDragging) return;
+        if (didDragRef.current) return;
+        if (clickTimer.current) {
+          clearTimeout(clickTimer.current);
+          clickTimer.current = null;
+        }
+        if (e.detail === 2) {
+          // Double click: open modal
+          onEdit();
+        } else {
+          // Single click: bring to front (call onClick)
+          clickTimer.current = setTimeout(() => {
+            onClick();
+            clickTimer.current = null;
+          }, 200);
+        }
+      }}
       onMouseEnter={() => !isDragging && setShowControls(true)}
       onMouseLeave={() => !isDragging && setShowControls(false)}
     >

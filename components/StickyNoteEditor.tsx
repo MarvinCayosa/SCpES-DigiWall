@@ -265,9 +265,9 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
               color: '#222',
               fontFamily: 'inherit',
               padding: mobile ? 16 : undefined,
-              background: 'rgba(255,255,255,0.45)',
+              background: 'rgba(255,255,255,0.35)',
               borderRadius: 8,
-              textShadow: '0 1px 4px #fff, 0 0 2px #000',
+              opacity: 0.7,
               mixBlendMode: 'multiply',
             }}
           >
@@ -288,8 +288,9 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
                 <SelectTrigger className="w-16 h-7 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontFamily: fontFamily, fontSize: '12px' }}><span style={{ fontFamily: fontFamily }}>{fontFamily}</span></SelectTrigger>
                 <SelectContent>{FONT_FAMILIES.map((font) => (<SelectItem key={font} value={font} className="text-xs" style={{ fontFamily: font, fontWeight: fontFamily === font ? 'bold' : 'normal', fontSize: '12px' }}>{font}</SelectItem>))}</SelectContent>
               </Select>
+              {/* --- MOBILE TOOLBAR FONT SIZE DROPDOWN --- */}
               <Select value={fontSize.toString()} onValueChange={value => { const size = FONT_SIZES[parseInt(value)-1] || 16; exec('fontSize', value); setFontSize(size); updateNote({ fontSize: size }); }}>
-                <SelectTrigger className="w-10 h-7 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between" style={{ fontSize: '12px' }}><span>{fontSize}</span></SelectTrigger>
+                <SelectTrigger className="w-14 h-7 text-xs bg-gray-800 border-gray-700 text-white font-normal rounded-full flex items-center justify-between" style={{ fontSize: '12px', letterSpacing: '0.01em' }}><span>{fontSize}</span></SelectTrigger>
                 <SelectContent>{FONT_SIZES.map((size, idx) => (<SelectItem key={size} value={(idx+1).toString()} className="text-xs" style={{ fontSize: '12px' }}>{size}</SelectItem>))}</SelectContent>
               </Select>
               <Button variant="ghost" size="icon" onClick={() => exec('bold')} className="rounded-md w-7 h-7 p-0 text-white hover:bg-gray-700 transition-all duration-150" style={{ fontFamily: 'inherit', fontSize: '12px' }}><Bold className="w-3 h-3" /></Button>
@@ -404,15 +405,10 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
                 ))}
               </SelectContent>
             </Select>
+            {/* --- DESKTOP TOOLBAR FONT SIZE DROPDOWN --- */}
             <Select value={fontSize.toString()} onValueChange={value => { const size = FONT_SIZES[parseInt(value)-1] || 16; exec('fontSize', value); setFontSize(size); updateNote({ fontSize: size }); }}>
-              <SelectTrigger className="w-16 h-8 text-xs bg-gray-800 border-gray-700 text-white font-medium rounded-full flex items-center justify-between">
-                <span>{fontSize}</span>
-              </SelectTrigger>
-              <SelectContent>
-                {FONT_SIZES.map((size, idx) => (
-                  <SelectItem key={size} value={(idx+1).toString()} className="text-xs">{size}</SelectItem>
-                ))}
-              </SelectContent>
+              <SelectTrigger className="w-20 h-8 text-xs bg-gray-800 border-gray-700 text-white font-normal rounded-full flex items-center justify-between" style={{ fontSize: '12px', letterSpacing: '0.01em' }}><span>{fontSize}</span></SelectTrigger>
+              <SelectContent>{FONT_SIZES.map((size, idx) => (<SelectItem key={size} value={(idx+1).toString()} className="text-xs" style={{ fontSize: '12px' }}>{size}</SelectItem>))}</SelectContent>
             </Select>
             <Button
               variant="ghost"
@@ -537,8 +533,8 @@ function ColorPickerPopover({ value, onChange, colors = COMMON_COLORS, label = "
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center bg-white shadow cursor-pointer">
-          <span className="w-6 h-6 rounded-full border-2 border-gray-400" style={{ background: value }} />
+        <button className="w-8 h-8 rounded-full border-2 border-gray-400 flex items-center justify-center bg-white shadow cursor-pointer mx-1 align-middle" style={{ verticalAlign: 'middle' }}>
+          <span className="w-6 h-6 rounded-full border-2" style={{ background: value, borderColor: value === '#FFFFFF' ? '#bbb' : value, boxShadow: value === '#FFFFFF' ? '0 0 0 2px #bbb' : undefined }} />
         </button>
       </PopoverTrigger>
       <PopoverContent className="flex flex-col items-center gap-2 w-auto min-w-[220px] p-3 z-[300]">
@@ -546,8 +542,8 @@ function ColorPickerPopover({ value, onChange, colors = COMMON_COLORS, label = "
           {colors.map((color: string) => (
             <button
               key={color}
-              className={`w-7 h-7 rounded-full border-2 ${value === color ? 'border-black' : 'border-white'} hover:border-gray-400 transition-all duration-100`}
-              style={{ background: color }}
+              className={`w-7 h-7 rounded-full border-2 ${value === color ? 'border-black' : 'border-gray-300'} hover:border-gray-400 transition-all duration-100`}
+              style={{ background: color, verticalAlign: 'middle' }}
               onClick={() => onChange(color)}
               aria-label={label}
             />
@@ -557,8 +553,9 @@ function ColorPickerPopover({ value, onChange, colors = COMMON_COLORS, label = "
             type="color"
             value={custom}
             onChange={e => { setCustom(e.target.value); onChange(e.target.value); }}
-            className="w-7 h-7 rounded-full border-2 border-white cursor-pointer"
+            className="w-7 h-7 rounded-full border-2 border-gray-300 cursor-pointer align-middle"
             aria-label="Custom color"
+            style={{ verticalAlign: 'middle' }}
           />
         </div>
       </PopoverContent>

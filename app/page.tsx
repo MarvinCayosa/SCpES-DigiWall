@@ -78,8 +78,8 @@ export default function DigitalFreedomWall() {
         createdAt: note.createdAt ? new Date(note.createdAt) : new Date(),
         updatedAt: note.updatedAt ? new Date(note.updatedAt) : new Date(),
       }))
-      // Sort notes by createdAt descending (newest first)
-      notes.sort((a, b) => (b.createdAt as any) - (a.createdAt as any));
+      // Sort notes by createdAt ascending (newest first)
+      notes.sort((a, b) => (a.createdAt as any) - (b.createdAt as any));
       setStickyNotes(notes)
     })
     return () => unsubscribe()
@@ -126,7 +126,7 @@ export default function DigitalFreedomWall() {
         updated[existingIndex] = { ...note, updatedAt: new Date() }
         // Move updated note to end (top)
         const [moved] = updated.splice(existingIndex, 1)
-        updated.unshift(moved)
+        updated.push(moved)
         return updated
       } else {
         return [note, ...prev]
@@ -151,7 +151,7 @@ export default function DigitalFreedomWall() {
     update(noteRef, { x, y, updatedAt: Date.now() })
     setStickyNotes((prev) => {
       const idx = prev.findIndex((n) => n.id === noteId);
-      if (idx === -1) return prev.map((note) => (note.id === noteId ? { ...note, x, y, updatedAt: new Date() } : note));
+      if (idx === -1) return prev;
       const updated = [...prev];
       const [moved] = updated.splice(idx, 1);
       updated.push({ ...moved, x, y, updatedAt: new Date() });
@@ -275,6 +275,10 @@ export default function DigitalFreedomWall() {
           onDelete={deleteNote}
         />
       )}
+      {/* Copyright footer, now subtle on main page */}
+      <footer className="fixed left-4 bottom-2 z-40 text-xs text-gray-400 font-normal select-none pointer-events-none" style={{fontFamily: 'inherit', opacity: 0.7, letterSpacing: '0.01em'}}>
+        Society of Computer Engineering Students 2025 -MC
+      </footer>
     </div>
   )
 }

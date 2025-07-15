@@ -5,13 +5,19 @@ import { db } from "@/lib/firebase";
 import StickyNoteEditor from "@/components/StickyNoteEditor";
 import type { StickyNote } from "@/lib/types";
 
-const defaultNote: StickyNote = {
+const COMMON_COLORS = [
+  "#FFE066", "#FFB6C1", "#87CEEB", "#98FB98", "#FFD166", "#A685E2", "#FFFFFF", "#F0E68C", "#FFA07A", "#20B2AA"
+];
+function getRandomColor() {
+  return COMMON_COLORS[Math.floor(Math.random() * COMMON_COLORS.length)];
+}
+const makeDefaultNote = () => ({
   id: "",
   x: 0,
   y: 0,
   width: 200,
   height: 200,
-  backgroundColor: "#FFE066",
+  backgroundColor: getRandomColor(),
   text: "",
   textColor: "#000000",
   fontSize: 24,
@@ -22,11 +28,11 @@ const defaultNote: StickyNote = {
   drawingData: null,
   createdAt: new Date(),
   updatedAt: new Date(),
-};
+});
 
 export default function SubmitPage() {
   const [sent, setSent] = useState(false);
-  const [note, setNote] = useState<StickyNote>(defaultNote);
+  const [note, setNote] = useState<StickyNote>(makeDefaultNote());
 
   const handleSave = async (note: StickyNote) => {
     try {
@@ -49,7 +55,7 @@ export default function SubmitPage() {
       setSent(true); // Only show modal if write succeeded
       setTimeout(() => {
         setSent(false);
-        setNote(defaultNote); // Reset the sticky note after modal disappears
+        setNote(makeDefaultNote()); // Reset the sticky note after modal disappears
       }, 2000);
     } catch (err: any) {
       alert("Failed to send note: " + (err?.message || err));
@@ -86,6 +92,10 @@ export default function SubmitPage() {
           50% { border-color: #fff; }
         }
       `}</style>
+      {/* Subtle copyright footer */}
+      <footer className="fixed left-1/2 -translate-x-1/2 bottom-2 z-40 text-xs text-gray-400 select-none pointer-events-none" style={{fontFamily: 'inherit', opacity: 0.7, letterSpacing: '0.01em'}}>
+        Society of Computer Engineering Students 2025 -MC
+      </footer>
     </div>
   );
 } 
