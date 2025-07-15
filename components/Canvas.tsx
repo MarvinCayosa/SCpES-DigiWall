@@ -106,20 +106,43 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
       [pan, onPanChange],
     )
 
-    // Prevent single-finger drag panning on mobile; allow only two-finger (pinch/zoom) for board movement
+    // Allow single-finger drag panning on mobile
     const handleTouchStart = useCallback((e: React.TouchEvent) => {
       if (isNoteDraggingGlobal) return;
-      if (e.touches.length > 1) {
-        // Allow panning/zooming with two fingers
+      if (e.touches.length === 1) {
+        // Allow panning with one finger
         isDragging.current = true;
         lastPanPoint.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         startPan.current = { ...pan };
-        // You can implement pinch/zoom logic here if desired
-      } else {
-        // Prevent single-finger drag from panning the board
-        isDragging.current = false;
+
+        const handleGlobalTouchMove = (te: TouchEvent) => {
+          if (!isDragging.current) return;
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+          }
+          animationFrameRef.current = requestAnimationFrame(() => {
+            const deltaX = te.touches[0].clientX - lastPanPoint.current.x;
+            const deltaY = te.touches[0].clientY - lastPanPoint.current.y;
+            onPanChange({
+              x: startPan.current.x + (te.touches[0].clientX - lastPanPoint.current.x),
+              y: startPan.current.y + (te.touches[0].clientY - lastPanPoint.current.y),
+            });
+          });
+        };
+
+        const handleGlobalTouchEnd = () => {
+          isDragging.current = false;
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+          }
+          document.removeEventListener('touchmove', handleGlobalTouchMove);
+          document.removeEventListener('touchend', handleGlobalTouchEnd);
+        };
+
+        document.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+        document.addEventListener('touchend', handleGlobalTouchEnd, { passive: false });
       }
-    }, [pan]);
+    }, [pan, onPanChange]);
 
     // Cleanup animation frame on unmount
     useEffect(() => {

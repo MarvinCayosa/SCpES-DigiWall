@@ -196,6 +196,20 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
     }, 3000);
   }, [editedNote, onSave, isSubmitting, initialNote]);
 
+  // Utility: check if drawing exists
+  function hasDrawing() {
+    if (!canvasRef.current) return false;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return false;
+    const pixelData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+    return pixelData.data.some((channel, index) => index % 4 === 3 && channel > 0);
+  }
+  // Utility: check if text is empty (ignoring <br> and whitespace)
+  function isTextEmpty() {
+    const html = editorRef.current?.innerHTML || '';
+    return !html || html === '<br>' || html.replace(/<[^>]+>/g, '').trim() === '';
+  }
+
   return (
     <div className={`w-full max-w-lg mx-auto ${mobile ? "p-2" : "p-8"} flex flex-col gap-4 bg-transparent rounded-2xl`}>
       <div
@@ -347,7 +361,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
           {/* Second row: only the Send button, centered and lower */}
           <div className="flex justify-center w-full mt-8 mb-2">
             <Button onClick={() => { handleSave(); }} size="lg" className="rounded-full bg-green-400 hover:bg-green-500 text-[#18181b] px-8 h-12 text-lg font-bold shadow transition-all duration-150 border border-green-400" style={{ fontFamily: 'inherit', boxShadow: 'none' }}
-              disabled={isSubmitting}
+              disabled={isSubmitting || (isTextEmpty() && !hasDrawing())}
             >Send</Button>
           </div>
           {/* Success modal popup with dark overlay */}
@@ -511,7 +525,7 @@ export default function StickyNoteEditor({ initialNote, onSave, mobile, sent }: 
             size="sm"
             className="rounded-md bg-green-300 hover:bg-green-400 text-[#18181b] px-4 h-8 text-base font-semibold shadow transition-all duration-150 border border-green-400"
             style={{ fontFamily: 'inherit', boxShadow: 'none' }}
-            disabled={isSubmitting}
+            disabled={isSubmitting || (isTextEmpty() && !hasDrawing())}
           >
             <Check className="w-4 h-4 mr-1" />
           </Button>

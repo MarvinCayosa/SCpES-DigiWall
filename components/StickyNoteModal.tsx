@@ -231,6 +231,20 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
     }
   }
 
+  // Utility: check if drawing exists
+  function hasDrawing() {
+    if (!canvasRef.current) return false;
+    const ctx = canvasRef.current.getContext('2d');
+    if (!ctx) return false;
+    const pixelData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+    return pixelData.data.some((channel, index) => index % 4 === 3 && channel > 0);
+  }
+  // Utility: check if text is empty (ignoring <br> and whitespace)
+  function isTextEmpty() {
+    const html = editorRef.current?.innerHTML || '';
+    return !html || html === '<br>' || html.replace(/<[^>]+>/g, '').trim() === '';
+  }
+
   if (!isOpen) return null
 
   return (
@@ -465,6 +479,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
           size="sm"
           className="rounded-md bg-green-300 hover:bg-green-400 text-[#18181b] px-4 h-8 text-base font-semibold shadow transition-all duration-150 border border-green-400"
           style={{ fontFamily: 'inherit', boxShadow: 'none' }}
+          disabled={(() => { const html = editorRef.current?.innerHTML || ''; const textEmpty = !html || html === '<br>' || html.replace(/<[^>]+>/g, '').trim() === ''; let drawing = false; if (canvasRef.current) { const ctx = canvasRef.current.getContext('2d'); if (ctx) { const pixelData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height); drawing = pixelData.data.some((channel, index) => index % 4 === 3 && channel > 0); } } return textEmpty && !drawing; })()}
         >
           <Check className="w-4 h-4 mr-1" />
         </Button>
