@@ -308,8 +308,9 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex flex-col items-center justify-center z-50 p-4">
+      {/* Modal Content with Padding */}
       <div
-        className="relative w-[600px] h-[600px] shadow-2xl transition-all duration-300 ease-out bg-white border border-white/40 rounded-2xl flex flex-col"
+        className="relative w-[600px] h-[600px] shadow-2xl transition-all duration-300 ease-out bg-white border border-white/40 rounded-2xl flex flex-col p-6"
         style={{
           backgroundColor: editedNote.backgroundColor,
           fontFamily: 'SF Pro Display, Arial, Helvetica, sans-serif',
@@ -327,7 +328,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
           <X className="w-5 h-5" />
         </Button>
         {/* Main Content - now fills the modal with padding */}
-        <div className="flex-1 relative overflow-hidden p-6"> {/* Added p-6 for padding */}
+        <div className="flex-1 relative overflow-hidden">
           {/* Drawing Canvas - fills modal */}
           <canvas
             ref={canvasRef}
@@ -364,7 +365,7 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
               borderRadius: 16,
               overflowX: 'hidden',
               scrollbarWidth: 'thin',
-              padding: 16, // Added padding here
+              padding: 8,
             }}
             onInput={() => {
               updateNote({ text: editorRef.current?.innerHTML || "" });
@@ -382,8 +383,8 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
           )}
         </div>
       </div>
-      {/* Toolbar OUTSIDE the modal, below the colored area */}
-      <div className="mt-4 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-6 py-3 flex flex-nowrap items-center gap-3 z-30 transition-all duration-300 max-w-[95vw] overflow-x-hidden scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent" style={{ fontFamily: 'inherit', minHeight: 56, overflowY: 'hidden' }}>
+      {/* Toolbar OUTSIDE the modal, no horizontal scroll, wraps if needed */}
+      <div className="mt-4 bg-[#18181b]/90 backdrop-blur-lg border border-white/20 shadow-2xl rounded-xl px-6 py-3 flex flex-wrap items-center gap-3 z-30 transition-all duration-300 max-w-[95vw]" style={{ fontFamily: 'inherit', minHeight: 56, overflowY: 'hidden' }}>
         {/* All children: min-w-0, flex-shrink-0 to prevent wrapping */}
         {/* Tool Toggle */}
         <Button
@@ -539,9 +540,9 @@ export default function StickyNoteModal({ note, isOpen, onClose, onSave, onDelet
           />
         </div>
         <div className="w-px h-6 bg-gray-700 mx-2 transition-all duration-300" />
-          <Button
-            onClick={handleSave}
-            size="sm"
+        <Button
+          onClick={handleSave}
+          size="sm"
           className="rounded-md bg-green-300 hover:bg-green-400 text-[#18181b] px-4 h-8 text-base font-semibold shadow transition-all duration-150 border border-green-400"
           style={{ fontFamily: 'inherit', boxShadow: 'none' }}
           disabled={(() => { const html = editorRef.current?.innerHTML || ''; const textEmpty = !html || html === '<br>' || html.replace(/<[^>]+>/g, '').trim() === ''; let drawing = false; if (canvasRef.current) { const ctx = canvasRef.current.getContext('2d'); if (ctx) { const pixelData = ctx.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height); drawing = pixelData.data.some((channel, index) => index % 4 === 3 && channel > 0); } } return textEmpty && !drawing; })()}
@@ -568,11 +569,10 @@ export function ViewStickyNoteModal({ note, isOpen, onClose }: ViewStickyNoteMod
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fadeIn">
       <div
-        className="relative w-[500px] h-[500px] transition-all duration-300 ease-out bg-white border border-white/40 rounded-2xl flex flex-col animate-zoomIn"
+        className="relative w-[600px] h-[600px] transition-all duration-300 ease-out bg-white border border-white/40 rounded-2xl flex flex-col p-6 animate-zoomIn"
         style={{
           backgroundColor: note.backgroundColor,
           fontFamily: 'SF Pro Display, Arial, Helvetica, sans-serif',
-          // Removed boxShadow for no drop shadow
         }}
       >
         {/* Close Button */}
@@ -584,47 +584,49 @@ export function ViewStickyNoteModal({ note, isOpen, onClose }: ViewStickyNoteMod
           style={{ fontFamily: 'inherit' }}
         >
           <X className="w-5 h-5" />
-          </Button>
-        {/* Main Content */}
-        <div className="p-8 h-full flex flex-col relative overflow-hidden">
-          <div className="flex-1 overflow-y-auto overflow-x-hidden relative">
-            {/* Drawing Canvas - if present */}
-            {note.drawingData?.imageData && (
-              <canvas
-                width={440}
-                height={320}
-                className="absolute inset-0 pointer-events-none z-0 rounded-xl"
-                style={{ opacity: 0.8, borderRadius: '16px' }}
-                ref={el => {
-                  if (el && note.drawingData?.imageData) {
-                    const ctx = el.getContext('2d');
-                    const img = new window.Image();
-                    img.crossOrigin = 'anonymous';
-                    img.onload = () => {
-                      ctx?.clearRect(0, 0, el.width, el.height);
-                      ctx?.drawImage(img, 0, 0, el.width, el.height);
-                    };
-                    img.src = note.drawingData.imageData;
-                  }
-                }}
-              />
-            )}
-            {/* Text Content - render as HTML */}
-            <div
-              className="flex-1 overflow-hidden relative z-10 text-lg font-medium"
-              style={{
-                color: note.textColor,
-                fontSize: note.fontSize,
-                fontFamily: 'inherit',
-                fontWeight: note.fontWeight,
-                fontStyle: note.fontStyle,
-                textDecoration: note.textDecoration,
-                boxShadow: 'none',
-                transition: 'font-size 0.2s cubic-bezier(.4,0,.2,1)',
+        </Button>
+        {/* Main Content - same as edit modal */}
+        <div className="flex-1 relative overflow-hidden">
+          {/* Drawing Canvas - fills modal if present */}
+          {note.drawingData?.imageData && (
+            <canvas
+              width={544}
+              height={544}
+              className="absolute inset-0 pointer-events-none z-0 rounded-xl"
+              style={{ borderRadius: '16px', width: '100%', height: '100%' }}
+              ref={el => {
+                if (el && note.drawingData?.imageData) {
+                  const ctx = el.getContext('2d');
+                  const img = new window.Image();
+                  img.crossOrigin = 'anonymous';
+                  img.onload = () => {
+                    ctx?.clearRect(0, 0, el.width, el.height);
+                    ctx?.drawImage(img, 0, 0, el.width, el.height);
+                  };
+                  img.src = note.drawingData.imageData;
+                }
               }}
-            >
-              {note.text && <div className="whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: note.text }} />}
-            </div>
+            />
+          )}
+          {/* Text Content - render as HTML, with padding */}
+          <div
+            className="absolute inset-0 z-10 text-lg font-medium overflow-y-auto"
+            style={{
+              color: note.textColor,
+              fontSize: note.fontSize,
+              fontFamily: note.fontFamily,
+              fontWeight: note.fontWeight,
+              fontStyle: note.fontStyle,
+              textDecoration: note.textDecoration,
+              boxShadow: 'none',
+              outline: 'none',
+              borderRadius: 16,
+              overflowX: 'hidden',
+              scrollbarWidth: 'thin',
+              padding: 8,
+            }}
+          >
+            {note.text && <div className="whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: note.text }} />}
           </div>
         </div>
       </div>

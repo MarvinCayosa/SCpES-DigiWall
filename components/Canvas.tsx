@@ -147,21 +147,6 @@ const Canvas = forwardRef<HTMLDivElement, CanvasProps>(
           if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
           }
-          // Inertia
-          let vx = velocity.current.x;
-          let vy = velocity.current.y;
-          const friction = 0.95;
-          const animate = () => {
-            if (Math.abs(vx) > 0.5 || Math.abs(vy) > 0.5) {
-              onPanChange({ x: panRef.current.x + vx, y: panRef.current.y + vy });
-              vx *= friction;
-              vy *= friction;
-              inertiaFrame.current = requestAnimationFrame(animate);
-            } else {
-              inertiaFrame.current = null;
-            }
-          };
-          animate();
           document.removeEventListener('touchmove', handleGlobalTouchMove);
           document.removeEventListener('touchend', handleGlobalTouchEnd);
           // --- Reset all refs ---
